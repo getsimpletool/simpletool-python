@@ -1,5 +1,6 @@
 import pytest
-from simpletool import BaseTool
+from simpletool import BaseTool, validate_tool_output
+from simpletool.types import ErrorData
 
 
 class DummyTool(BaseTool):
@@ -28,3 +29,38 @@ async def test_base_tool_execute():
     tool = DummyTool()
     result = await tool.execute({})
     assert result[0]["text"] == "Execute method result"
+
+
+@pytest.mark.asyncio
+async def test_validate_tool_output_non_list():
+    """Test validate_tool_output decorator raises TypeError for non-list output."""
+    @validate_tool_output
+    async def dummy_tool_non_list():
+        return "not a list"
+
+    with pytest.raises(TypeError, match="Tool output must be a list"):
+        await dummy_tool_non_list()
+
+
+@pytest.mark.asyncio
+async def test_validate_tool_output_invalid_type():
+    """Test validate_tool_output decorator raises TypeError for invalid output type."""
+    @validate_tool_output
+    async def dummy_tool_invalid_type():
+        return [42]  # Invalid type
+
+    with pytest.raises(TypeError, match="Invalid output type"):
+        await dummy_tool_invalid_type()
+
+
+@pytest.mark.asyncio
+async def test_validate_tool_output_error_data():
+    """Test validate_tool_output decorator passes through ErrorData."""
+    error_data = ErrorData(code=1, message="Test error")
+
+    @validate_tool_output
+    async def dummy_tool_error_data():
+        return error_data
+
+    result = await dummy_tool_error_data()
+    assert result == error_data

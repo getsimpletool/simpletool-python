@@ -39,3 +39,12 @@ def test_resource_contents():
     assert str(resource.resource.uri) == "https://example.com/document.txt"
     assert resource.resource.mime_type == "text/plain"
     assert resource.resource.text == "Sample text content"
+
+
+def test_get_valid_content_types():
+    """Test that get_valid_content_types returns the correct content types."""
+    from simpletool import get_valid_content_types
+    from simpletool.types import ImageContent, TextContent, EmbeddedResource
+
+    valid_types = get_valid_content_types()
+    assert set(valid_types) == {ImageContent, TextContent, EmbeddedResource}

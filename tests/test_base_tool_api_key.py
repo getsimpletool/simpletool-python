@@ -28,3 +28,17 @@ def test_select_random_api_key_multiple(mock_env):
     tool = DummyTool()
     api_key = tool._select_random_api_key("DUMMY_TOOL_API_KEY", "key1,key2,key3")
     assert api_key in ["key1", "key2", "key3"]
+
+
+def test_select_random_api_key_non_api_key(mock_env):
+    """Test selecting a non-API key environment variable."""
+    tool = DummyTool()
+    non_api_key = tool._select_random_api_key("DUMMY_TOOL_REGULAR_KEY", "regular_value")
+    assert non_api_key == "regular_value"
+
+
+def test_select_random_api_key_empty_list(mock_env):
+    """Test selecting an API key from an empty list."""
+    tool = DummyTool()
+    api_key = tool._select_random_api_key("DUMMY_TOOL_API_KEY", "")
+    assert api_key == ""

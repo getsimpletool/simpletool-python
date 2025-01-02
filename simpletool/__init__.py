@@ -4,11 +4,43 @@ This module contains the base class for all simple tools.
 import os
 import random
 import json
+import functools
 from abc import ABC
-from typing import List, Dict, Any, Union, Type, Literal
+from typing import List, Dict, Any, Union, Type, Literal, TypeVar, Tuple
 from pydantic import BaseModel, Field
 from pydantic.json_schema import GenerateJsonSchema
 from .types import ImageContent, TextContent, EmbeddedResource, ErrorData
+
+
+ContentT = TypeVar('ContentT', ImageContent, TextContent, EmbeddedResource)
+
+
+def get_valid_content_types() -> Tuple[Type[Any], ...]:
+    # Directly return the types from the TypeVar definition
+    return ContentT.__constraints__
+
+
+def validate_tool_output(func):
+    @functools.wraps(func)
+    async def wrapper(*args: Any, **kwargs: Any) -> Union[List[ContentT], ErrorData]:
+        result = await func(*args, **kwargs)
+
+        # If result is ErrorData, return it as-is
+        if isinstance(result, ErrorData):
+            return result
+
+        # Validate result type
+        if not isinstance(result, list):
+            raise TypeError("Tool output must be a list")
+
+        valid_types = get_valid_content_types()
+        for item in result:
+            if not isinstance(item, valid_types):
+                raise TypeError(f"Invalid output type: {type(item)}. "
+                                f"Expected one of {[t.__name__ for t in valid_types]}")
+
+        return result
+    return wrapper
 
 
 class BaseTool(ABC):
@@ -17,7 +49,8 @@ class BaseTool(ABC):
     description: Union[str, None] = None
     input_schema: dict[str, Any] = Field(..., alias='inputSchema')
 
-    async def run(self, arguments: Dict[str, Any]) -> Union[List[Union[ImageContent, TextContent, EmbeddedResource]], ErrorData]:
+    @validate_tool_output
+    async def run(self, arguments: Dict[str, Any]) -> Union[List[ContentT], ErrorData]:
         """Execute the tool with the given arguments"""
         # Try execute method first
         if hasattr(self, 'execute'):
@@ -29,7 +62,8 @@ class BaseTool(ABC):
         # Fallback to default implementation
         raise NotImplementedError("Tool must implement either 'run' or 'execute' async method")
 
-    async def execute(self, arguments: Dict[str, Any]) -> Union[List[Union[ImageContent, TextContent, EmbeddedResource]], ErrorData]:
+    @validate_tool_output
+    async def execute(self, arguments: Dict[str, Any]) -> Union[List[ContentT], ErrorData]:
         """Alternative name for run method"""
         # Try run method first
         if hasattr(self, 'run'):
@@ -45,6 +79,8 @@ class BaseTool(ABC):
         """ Select random api key from env_value only if env_name contains 'API' and 'KEY' """
         if 'API' in env_name.upper() and 'KEY' in env_name.upper():
             api_keys = list(filter(bool, [key.strip() for key in env_value.split(',')]))
+            if not api_keys:
+                return ""
             return api_keys[0] if len(api_keys) == 1 else random.choice(api_keys)
         return env_value  # return original value if not an API key
 
