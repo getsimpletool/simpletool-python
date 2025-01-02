@@ -9,11 +9,13 @@ class Content(BaseModel):
     type: Literal["text", "image", "resource"]
     model_config = ConfigDict(extra="allow")
 
+
 class TextContent(BaseModel):
     """Text content for a message."""
     type: Literal["text"]
     text: str
     model_config = ConfigDict(extra="allow")
+
 
 class ImageContent(BaseModel):
     """Image content for a message."""
@@ -22,19 +24,23 @@ class ImageContent(BaseModel):
     mime_type: str = Field(alias="mimeType")
     model_config = ConfigDict(extra="allow")
 
+
 class ResourceContents(BaseModel):
     """The contents of a resource, embedded into a prompt or tool call result."""
     uri: AnyUrl
     mime_type: str | None = Field(None, alias="mimeType")
     model_config = ConfigDict(extra="allow")
 
+
 class TextResourceContents(ResourceContents):
     """ Tee contents of a text resource, embedded into a prompt or tool call result."""
     text: str
 
+
 class BlobResourceContents(ResourceContents):
     """ The contents of a blob resource, embedded into a prompt or tool call result."""
     blob: str
+
 
 class EmbeddedResource(BaseModel):
     """
@@ -52,5 +58,5 @@ class ErrorData(BaseModel):
     """Error information for JSON-RPC error responses."""
     code: int = Field(description="A number that indicates the error type that occurred.")
     message: str = Field(description="A short description of the error. The message SHOULD be limited to a concise single sentence.")
-    data: Any | None = Field(default=None, description="Additional information about the error. The value of this member is defined by the sender (e.g. detailed error information, nested errors etc.).")
+    data: Any | None = Field(default=None, description="Additional information about the error.")
     model_config = ConfigDict(extra="allow")

@@ -40,7 +40,7 @@ class BaseTool(ABC):
         # Fallback to default implementation
         raise NotImplementedError("Tool must implement either 'run' or 'execute' async method")
 
-    def _select_random_api_key(self, env_name:str, env_value: str) -> str:
+    def _select_random_api_key(self, env_name: str, env_value: str) -> str:
         """ Select random api key from env_value only if env_name contains 'API' and 'KEY' """
         if 'API' in env_name.upper() and 'KEY' in env_name.upper():
             api_keys = list(filter(bool, [key.strip() for key in env_value.split(',')]))
