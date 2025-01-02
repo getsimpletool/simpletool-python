@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-python/tree/master).
 
+
+## [0.0.3] - 2025-01-02
+
+### Fixed
+- upgrade to 0.0.2 breaks loading of tool (#1).
+
+### Added
+- run test now will now run Autopep8 to fix some formating issues and Flake8 linting on test files
+
 ## [0.0.2] - 2025-01-02
 
 ### Added

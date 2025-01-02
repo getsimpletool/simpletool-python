@@ -1,0 +1,11 @@
+[flake8]
+max-line-length = 200
+exclude = 
+    .git,
+    __pycache__,
+    venv,
+    build,
+    dist
+per-file-ignores = 
+    # Allow longer lines in test files
+    tests/*.py: E501

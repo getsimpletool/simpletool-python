@@ -94,6 +94,20 @@ class BaseTool(ABC):
             "input_schema": self.input_schema
         }).encode("utf-8").decode("unicode_escape")
 
+    def __init_subclass__(cls, **kwargs):
+        """
+        Validate mandatory attributes for tool subclasses.
+        """
+        super().__init_subclass__(**kwargs)
+
+        # Check name (mandatory)
+        if not hasattr(cls, 'name') or not isinstance(cls.name, str) or not cls.name.strip():
+            raise TypeError(f"Subclass {cls.__name__} must define a non-empty 'name' string attribute")
+
+        # Check input_schema (mandatory)
+        if not hasattr(cls, 'input_schema') or not isinstance(cls.input_schema, dict):
+            raise TypeError(f"Subclass {cls.__name__} must define 'input_schema' as a dictionary")
+
     @property
     def info(self) -> str:
         """Return a one-line JSON string representation of the tool."""

@@ -1,9 +1,8 @@
 import importlib
-import ast
-import pytest
 import os
 import sys
 import importlib.util
+
 
 def test_setup_metadata():
     """Test the metadata in setup.py."""
@@ -19,9 +18,10 @@ def test_setup_metadata():
 
         # Monkey patch setuptools.setup to capture arguments
         captured_setup_args = {}
+
         def capture_setup(**kwargs):
             captured_setup_args.update(kwargs)
-        
+
         import setuptools
         original_setup = setuptools.setup
         setuptools.setup = capture_setup
@@ -49,16 +49,15 @@ def test_setup_metadata():
         assert 'License :: OSI Approved :: MIT License' in classifiers
         assert 'Programming Language :: Python :: 3' in classifiers
 
-        
-        assert captured_setup_args['zip_safe'] == False
-        
+        assert captured_setup_args['zip_safe'] is False
+
         # Check README.md exists and is not empty
         readme_path = 'README.md'
         assert os.path.exists(readme_path), f"README.md file does not exist at {readme_path}"
         with open(readme_path, 'r') as readme_file:
             readme_content = readme_file.read().strip()
             assert readme_content, "README.md file is empty"
-            
+
             # Compare normalized content (remove extra whitespace)
             normalized_readme = ' '.join(readme_content.split())
             normalized_long_desc = ' '.join(captured_setup_args['long_description'].split())

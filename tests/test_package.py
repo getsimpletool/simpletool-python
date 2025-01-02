@@ -1,8 +1,7 @@
 import importlib
-import importlib
 import pytest
-import simpletool
 import ast
+
 
 def test_package_importable():
     """Verify that the simpletool package can be imported."""
@@ -14,11 +13,11 @@ def test_package_importable():
 
 def test_package_metadata():
     """Basic validation of package metadata."""
-    
+
     # Parse setup.py to get the version
     with open('setup.py', 'r') as f:
         tree = ast.parse(f.read())
-    
+
     version = None
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'setup':
@@ -29,5 +28,5 @@ def test_package_metadata():
                         break
             if version:
                 break
-    
+
     assert version, "Package version should not be empty"
