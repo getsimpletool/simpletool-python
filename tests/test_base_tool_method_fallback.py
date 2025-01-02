@@ -1,8 +1,9 @@
 import pytest
 import asyncio
 import os
-from simpletool import BaseTool
+from simpletool import BaseTool, TextContent, ImageContent, EmbeddedResource, ErrorData
 from pydantic import BaseModel, Field
+from typing import List, Union
 
 class DummyInputModel(BaseModel):
     name: str = Field(description="Name of the item")
@@ -18,16 +19,16 @@ class PartialTool(BaseTool):
     description = "A tool with only execute method"
     input_schema = {"type": "object", "properties": {}}
 
-    async def execute(self, arguments):
-        return [{"type": "text", "text": "Executed"}]
+    async def execute(self, arguments) -> Union[List[Union[ImageContent, TextContent, EmbeddedResource]], ErrorData]:
+        return [TextContent(type="text", text="Executed")]
 
 class PartialRunTool(BaseTool):
     name = "partial_run_tool"
     description = "A tool with only run method"
     input_schema = {"type": "object", "properties": {}}
 
-    async def run(self, arguments):
-        return [{"type": "text", "text": "Ran"}]
+    async def run(self, arguments) -> Union[List[Union[ImageContent, TextContent, EmbeddedResource]], ErrorData]:
+        return [TextContent(type="text", text="Ran")]
 
 def test_run_method_fallback():
     """Test method fallback mechanism when run method is not implemented."""
@@ -46,12 +47,12 @@ def test_run_method_not_implemented():
     # Tools with only execute method
     execute_tool = PartialTool()
     result = asyncio.run(execute_tool.run({}))
-    assert result == [{"type": "text", "text": "Executed"}]
+    assert result == [TextContent(type="text", text="Executed")]
 
     # Tools with only run method
     run_tool = PartialRunTool()
     result = asyncio.run(run_tool.execute({}))
-    assert result == [{"type": "text", "text": "Ran"}]
+    assert result == [TextContent(type="text", text="Ran")]
 
 def test_method_fallback_edge_cases():
     """Test edge cases in method fallback mechanism."""
@@ -95,8 +96,8 @@ def test_get_env_prefix_handling():
     assert 'TEST_VAR2' in env_result
     assert 'OTHER_VAR' not in env_result
 
-    # Test with dictionary prefix
-    env_result = tool.get_env({}, prefix={'TEST_': 'something'})
+    # Test with list prefix
+    env_result = tool.get_env({}, prefix=['TEST_'])
     assert 'TEST_VAR1' in env_result
     assert 'TEST_VAR2' in env_result
     assert 'OTHER_VAR' not in env_result
