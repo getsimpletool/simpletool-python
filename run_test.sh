@@ -19,5 +19,5 @@ python -m coverage
 
 # if .vscode folder exist.. then remove htmlcov
 if [ -d ".vscode" ]; then
-    rm -rf htmlcov
+    rm -rf htmlcov .pytest_cache .coverage simpletool.egg-info
 fi

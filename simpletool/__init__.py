@@ -72,8 +72,6 @@ class BaseTool(ABC):
             envs = {k: v for k, v in envs.items() if k.startswith(prefix)}
         elif isinstance(prefix, list):
             envs = {k: v for k, v in envs.items() if any(k.startswith(pre) for pre in prefix)}
-        elif isinstance(prefix, dict):
-            envs = {k: v for k, v in envs.items() if any(k.startswith(key) for key in prefix.keys())}
 
         # 5) lets replace API_KEYS with random one if it is a list
         for key, value in envs.items():
