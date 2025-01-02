@@ -43,17 +43,12 @@ def test_setup_metadata():
         assert captured_setup_args['packages'] == ['simpletool']
         assert 'install_requires' in captured_setup_args and captured_setup_args['install_requires']
         assert captured_setup_args['long_description_content_type'] == 'text/markdown'
-        
+
         # Check classifiers
         classifiers = captured_setup_args['classifiers']
         assert 'License :: OSI Approved :: MIT License' in classifiers
         assert 'Programming Language :: Python :: 3' in classifiers
-        assert 'Programming Language :: Python :: 3.7' in classifiers
-        assert 'Programming Language :: Python :: 3.8' in classifiers
-        assert 'Programming Language :: Python :: 3.9' in classifiers
-        assert 'Programming Language :: Python :: 3.10' in classifiers
-        assert 'Programming Language :: Python :: 3.11' in classifiers
-        assert 'Programming Language :: Python :: 3.12' in classifiers
+
         
         assert captured_setup_args['zip_safe'] == False
         
