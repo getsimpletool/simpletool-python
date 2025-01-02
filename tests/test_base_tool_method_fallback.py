@@ -5,14 +5,17 @@ from simpletool import BaseTool, TextContent, ImageContent, EmbeddedResource, Er
 from pydantic import BaseModel, Field
 from typing import List, Union
 
+
 class DummyInputModel(BaseModel):
     name: str = Field(description="Name of the item")
     value: int = Field(description="Value of the item")
+
 
 class DummyTool(BaseTool):
     name = "dummy_tool"
     description = "A dummy tool for testing"
     input_schema = {"type": "object", "properties": {}}
+
 
 class PartialTool(BaseTool):
     name = "partial_tool"
@@ -22,6 +25,7 @@ class PartialTool(BaseTool):
     async def execute(self, arguments) -> Union[List[Union[ImageContent, TextContent, EmbeddedResource]], ErrorData]:
         return [TextContent(type="text", text="Executed")]
 
+
 class PartialRunTool(BaseTool):
     name = "partial_run_tool"
     description = "A tool with only run method"
@@ -30,17 +34,20 @@ class PartialRunTool(BaseTool):
     async def run(self, arguments) -> Union[List[Union[ImageContent, TextContent, EmbeddedResource]], ErrorData]:
         return [TextContent(type="text", text="Ran")]
 
+
 def test_run_method_fallback():
     """Test method fallback mechanism when run method is not implemented."""
     tool = DummyTool()
     with pytest.raises(NotImplementedError, match="Tool must implement either 'run' or 'execute' async method"):
         asyncio.run(tool.run({}))
 
+
 def test_execute_method_fallback():
     """Test method fallback mechanism when execute method is not implemented."""
     tool = DummyTool()
     with pytest.raises(NotImplementedError, match="Tool must implement either 'run' or 'execute' async method"):
         asyncio.run(tool.execute({}))
+
 
 def test_run_method_not_implemented():
     """Test that a tool can implement either run or execute method."""
@@ -53,6 +60,7 @@ def test_run_method_not_implemented():
     run_tool = PartialRunTool()
     result = asyncio.run(run_tool.execute({}))
     assert result == [TextContent(type="text", text="Ran")]
+
 
 def test_method_fallback_edge_cases():
     """Test edge cases in method fallback mechanism."""
@@ -81,6 +89,7 @@ def test_method_fallback_edge_cases():
     result = asyncio.run(tool.execute({}))
     assert result == []
 
+
 def test_get_env_prefix_handling():
     """Test the get_env method with various prefix types."""
     tool = DummyTool()
@@ -108,6 +117,7 @@ def test_get_env_prefix_handling():
     assert 'TEST_VAR2' in env_result
     assert 'OTHER_VAR' in env_result
 
+
 def test_select_random_api_key():
     """Test the _select_random_api_key method."""
     tool = DummyTool()
@@ -123,6 +133,7 @@ def test_select_random_api_key():
     # Test non-API key
     result = tool._select_random_api_key('REGULAR_KEY', 'regular_value')
     assert result == 'regular_value'
+
 
 def test_to_json_schema():
     """Test the to_json method with different schema types."""

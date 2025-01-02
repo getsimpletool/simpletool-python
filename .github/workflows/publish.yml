@@ -4,12 +4,23 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+  workflow_call:
+    secrets:
+      PYPI_TOKEN:
+        required: false
+  push:
+    paths:
+      - 'setup.py'
 
 permissions:
   contents: read
 
 jobs:
+  test:
+    uses: ./.github/workflows/python-test.yml
+
   release-build:
+    needs: test
     runs-on: ubuntu-latest
 
     permissions:

@@ -1,6 +1,7 @@
 import pytest
 from simpletool import BaseTool
 
+
 class DummyTool(BaseTool):
     name = "dummy_tool"
     description = "A dummy tool for testing"
@@ -12,12 +13,14 @@ class DummyTool(BaseTool):
     async def execute(self, arguments):
         return [{"type": "text", "text": "Execute method result"}]
 
+
 @pytest.mark.asyncio
 async def test_base_tool_run():
     """Test the run method of BaseTool."""
     tool = DummyTool()
     result = await tool.run({})
     assert result[0]["text"] == "Run method result"
+
 
 @pytest.mark.asyncio
 async def test_base_tool_execute():

@@ -3,6 +3,7 @@ This module contains the base class for all simple tools.
 """
 import os
 import random
+import json
 from abc import ABC
 from typing import List, Dict, Any, Union, Type, Literal
 from pydantic import BaseModel, Field
@@ -84,6 +85,32 @@ class BaseTool(ABC):
         if schema == "no_title_description":
             return input_model.model_json_schema(schema_generator=NoTitleDescriptionJsonSchema)
         return input_model.model_json_schema()
+
+    def __str__(self) -> str:
+        """Return a one-line JSON string representation of the tool."""
+        return json.dumps({
+            "name": self.name,
+            "description": self.description,
+            "input_schema": self.input_schema
+        }).encode("utf-8").decode("unicode_escape")
+
+    @property
+    def info(self) -> str:
+        """Return a one-line JSON string representation of the tool."""
+        return json.dumps({
+            "name": self.name,
+            "description": self.description,
+            "input_schema": self.input_schema
+        }, indent=4)
+
+    @property
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a dictionary representation of the tool."""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "input_schema": self.input_schema
+        }
 
 
 class NoTitleDescriptionJsonSchema(GenerateJsonSchema):

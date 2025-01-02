@@ -4,6 +4,11 @@ run-name: PyTest and Flake8
 on:
   workflow_dispatch:
   workflow_call:
+  push:
+    paths:
+      - 'tests/**'
+      - 'simpletool/**'
+      - 'setup.py'
 
 jobs:
   ### TEST ######################################################
