@@ -32,6 +32,7 @@ jobs:
             python -m pip install --upgrade pip
             python -m pip install pytest pytest>=7.1.3 pytest-cov>=2.8.1 pytest-randomly>=3.12.0 pytest-xdist flake8
             if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+            if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
         
     - name: Lint with flake8
       run: |
@@ -42,7 +43,7 @@ jobs:
 
     - name: Test with pytest
       run: |
-        pytest --cov=$PYPI_NAME --cov-report=term-missing --cov-report=html
+        python -m pytest --cov=simpletool --cov-report=term-missing --cov-report=html tests/
 
     - name: Final, set Test Status = OK
       run: echo "TEST_STATUS=ok" >> $GITHUB_ENV
