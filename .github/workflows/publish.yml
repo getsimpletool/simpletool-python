@@ -8,9 +8,7 @@ on:
     secrets:
       PYPI_TOKEN:
         required: false
-  push:
-    paths:
-      - 'setup.py'
+
 
 permissions:
   contents: read
