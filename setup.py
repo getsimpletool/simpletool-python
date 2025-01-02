@@ -8,7 +8,7 @@ setup(name='simpletool',
       author_email='contact@nchekwa.com',
       license='MIT',
       packages=['simpletool'],
-      install_requires=['pydantic>=2.0.0', 'typing-extensions'],
+      install_requires=['pydantic>=2.0.0', 'typing-extensions', 'pydantic>=2.10.4'],
       long_description=open('README.md').read(),
       long_description_content_type='text/markdown',
       classifiers=[
