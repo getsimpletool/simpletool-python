@@ -60,7 +60,7 @@ async def test_validate_tool_output_error_data():
 
     @validate_tool_output
     async def dummy_tool_error_data():
-        return error_data
+        return [error_data]  # Wrap ErrorData in a list
 
     result = await dummy_tool_error_data()
-    assert result == error_data
+    assert result == [error_data]

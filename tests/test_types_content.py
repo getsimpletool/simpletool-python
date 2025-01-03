@@ -44,7 +44,7 @@ def test_resource_contents():
 def test_get_valid_content_types():
     """Test that get_valid_content_types returns the correct content types."""
     from simpletool import get_valid_content_types
-    from simpletool.types import ImageContent, TextContent, EmbeddedResource
+    from simpletool.types import ImageContent, TextContent, EmbeddedResource, ErrorData
 
     valid_types = get_valid_content_types()
-    assert set(valid_types) == {ImageContent, TextContent, EmbeddedResource}
+    assert set(valid_types) == {ImageContent, TextContent, EmbeddedResource, ErrorData}

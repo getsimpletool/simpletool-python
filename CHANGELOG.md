@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-python/tree/master).
 
+## [0.0.5] - 2025-01-03
+
+### Fixed
+- tool should from now always return list of elements - List[ContentT]
+
 ## [0.0.4] - 2025-01-02
 
 ### Fixed

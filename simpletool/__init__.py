@@ -12,7 +12,7 @@ from pydantic.json_schema import GenerateJsonSchema
 from .types import ImageContent, TextContent, EmbeddedResource, ErrorData
 
 
-ContentT = TypeVar('ContentT', ImageContent, TextContent, EmbeddedResource)
+ContentT = TypeVar('ContentT', ImageContent, TextContent, EmbeddedResource, ErrorData)
 
 
 def get_valid_content_types() -> Tuple[Type[Any], ...]:
@@ -22,12 +22,8 @@ def get_valid_content_types() -> Tuple[Type[Any], ...]:
 
 def validate_tool_output(func):
     @functools.wraps(func)
-    async def wrapper(*args: Any, **kwargs: Any) -> Union[List[ContentT], ErrorData]:
+    async def wrapper(*args: Any, **kwargs: Any) -> List[ContentT]:
         result = await func(*args, **kwargs)
-
-        # If result is ErrorData, return it as-is
-        if isinstance(result, ErrorData):
-            return result
 
         # Validate result type
         if not isinstance(result, list):
@@ -50,7 +46,7 @@ class BaseTool(ABC):
     input_schema: dict[str, Any] = Field(..., alias='inputSchema')
 
     @validate_tool_output
-    async def run(self, arguments: Dict[str, Any]) -> Union[List[ContentT], ErrorData]:
+    async def run(self, arguments: Dict[str, Any]) -> List[ContentT]:
         """Execute the tool with the given arguments"""
         # Try execute method first
         if hasattr(self, 'execute'):
@@ -63,7 +59,7 @@ class BaseTool(ABC):
         raise NotImplementedError("Tool must implement either 'run' or 'execute' async method")
 
     @validate_tool_output
-    async def execute(self, arguments: Dict[str, Any]) -> Union[List[ContentT], ErrorData]:
+    async def execute(self, arguments: Dict[str, Any]) -> List[ContentT]:
         """Alternative name for run method"""
         # Try run method first
         if hasattr(self, 'run'):
@@ -177,6 +173,7 @@ class NoTitleDescriptionJsonSchema(GenerateJsonSchema):
     Methods:
         generate(*args, **kwargs): Generates a JSON schema and removes title/description fields
     """
+
     def generate(self, *args, **kwargs):
         result = super().generate(*args, **kwargs)
 
