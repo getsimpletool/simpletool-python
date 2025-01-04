@@ -9,12 +9,12 @@ and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-p
 ## [0.0.7] - 2025-01-05
 
 ### Added
-- test which covere decoretor @validate_tool_output - used to check if user return only valid list of elements types
-- added FileContent whcih return encoded base64 file content and mime of this file
-- added in ResourceContents mandatory `name` attribute and optional `description` attribute - as servere needs to be able idenitfy resource also by the `name` (which will work as `id` in database)
+- test which cover decorator @validate_tool_output - used to check if users return only valid list of elements types
+- added FileContent which return encoded base64 file content and mime of this file
+- added in ResourceContents mandatory `name` attribute and optional `description` attribute - as server needs to be able to identify resource also by the `name` (which will work as `id` in database)
 
 ### Fixed
-- run/execute should return Sequence (which is covariant) instead of List (which is invariant) - that should fully allow return mix of types whit no linter warnings
+- run/execute should return Sequence (which is covariant) instead of List (which is invariant) - that should fully allow return mix of types with no linter warnings
 
 ## [0.0.6] - 2025-01-04
 
