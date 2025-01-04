@@ -30,6 +30,7 @@ The `types.py` file defines the following data types:
 -   `Content`: Base class for content types.
 -   `TextContent`: Represents text content.
 -   `ImageContent`: Represents image content.
+-   `FileContent`: Represents file content with base64 encoded data and optional file name and MIME type.
 -   `ResourceContents`: Represents the contents of a resource.
 -   `TextResourceContents`: Represents the contents of a text resource.
 -   `BlobResourceContents`: Represents the contents of a blob resource.
@@ -145,7 +146,6 @@ class MyTool(BaseTool):
 
 my_tool = MyTool()
 ```
-
 
 
 ```python
