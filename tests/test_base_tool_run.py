@@ -1,6 +1,13 @@
 import pytest
 from simpletool import BaseTool, validate_tool_output
-from simpletool.types import ErrorData
+from simpletool.types import ErrorData, TextContent
+from pydantic import BaseModel, Field
+
+
+class DummyContentType(BaseModel):
+    """A dummy content type not in the allowed list for testing invalid type handling."""
+    type: str = Field(default="dummy")
+    content: str = Field(default="dummy content")
 
 
 class DummyTool(BaseTool):
@@ -64,3 +71,25 @@ async def test_validate_tool_output_error_data():
 
     result = await dummy_tool_error_data()
     assert result == [error_data]
+
+
+@pytest.mark.asyncio
+async def test_validate_tool_output_single_content_type():
+    """Test validate_tool_output decorator raises TypeError when a content type is returned instead of a list."""
+    @validate_tool_output
+    async def dummy_tool_single_content():
+        return TextContent(type="text", text="Single content")  # Not wrapped in a list
+
+    with pytest.raises(TypeError, match="Tool output must be a list"):
+        await dummy_tool_single_content()
+
+
+@pytest.mark.asyncio
+async def test_validate_tool_output_mixed_invalid_types():
+    """Test validate_tool_output decorator raises TypeError for return invalid type in the list."""
+    @validate_tool_output
+    async def dummy_tool_mixed_types():
+        return [DummyContentType(type="dummy", content="dummy content"), 42]
+
+    with pytest.raises(TypeError, match="Invalid output type"):
+        await dummy_tool_mixed_types()

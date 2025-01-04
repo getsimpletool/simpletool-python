@@ -1,7 +1,8 @@
 """ Type definitions for the simpletool package."""
 from typing import Literal, Any
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.networks import AnyUrl
+import base64
 
 
 class Content(BaseModel):
@@ -21,15 +22,67 @@ class ImageContent(BaseModel):
     """Image content for a message."""
     type: Literal["image"]
     data: str
-    mime_type: str = Field(alias="mimeType")
-    model_config = ConfigDict(extra="allow")
+    mime_type: str | None = None
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    @model_validator(mode='before')
+    @classmethod
+    def _convert_camel_to_snake_names(cls, data):
+        if isinstance(data, dict) and 'mimeType' in data:
+            data['mime_type'] = data.pop('mimeType')
+        return data
+
+    @field_validator('data')
+    def validate_base64(cls, value):
+        try:
+            # Attempt to decode the base64 data
+            base64.b64decode(value, validate=True)
+            return value
+        except Exception:
+            raise ValueError("Data must be a valid base64 encoded string")
+
+
+class FileContent(BaseModel):
+    """File content with verification of encoded base64 data and mime type for a message."""
+    type: Literal["file"]
+    data: str
+    file_name: str | None = None
+    mime_type: str | None = None
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    @model_validator(mode='before')
+    @classmethod
+    def _convert_camel_to_snake_names(cls, data):
+        if isinstance(data, dict) and 'mimeType' in data:
+            data['mime_type'] = data.pop('mimeType')
+        if isinstance(data, dict) and 'fileName' in data:
+            data['file_name'] = data.pop('fileName')
+        return data
+
+    @field_validator('data')
+    def validate_base64(cls, value):
+        try:
+            # Attempt to decode the base64 data
+            base64.b64decode(value, validate=True)
+            return value
+        except Exception:
+            raise ValueError("Data must be a valid base64 encoded string")
 
 
 class ResourceContents(BaseModel):
     """The contents of a resource, embedded into a prompt or tool call result."""
     uri: AnyUrl
-    mime_type: str | None = Field(None, alias="mimeType")
-    model_config = ConfigDict(extra="allow")
+    name: str
+    description: str | None = None
+    mime_type: str | None = None
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    @model_validator(mode='before')
+    @classmethod
+    def _convert_camel_to_snake_names(cls, data):
+        if isinstance(data, dict) and 'mimeType' in data:
+            data['mime_type'] = data.pop('mimeType')
+        return data
 
 
 class TextResourceContents(ResourceContents):

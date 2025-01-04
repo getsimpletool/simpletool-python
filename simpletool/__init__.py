@@ -6,23 +6,20 @@ import random
 import json
 import functools
 from abc import ABC
-from typing import List, Dict, Any, Union, Type, Literal, TypeVar, Tuple
+from typing import List, Dict, Any, Union, Type, Literal, Sequence, Tuple
 from pydantic import BaseModel, Field
 from pydantic.json_schema import GenerateJsonSchema
-from .types import ImageContent, TextContent, EmbeddedResource, ErrorData
+from .types import ImageContent, TextContent, FileContent, EmbeddedResource, ErrorData
 
 
-ContentT = TypeVar('ContentT', ImageContent, TextContent, EmbeddedResource, ErrorData)
-
-
-def get_valid_content_types() -> Tuple[Type[Any], ...]:
-    # Directly return the types from the TypeVar definition
-    return ContentT.__constraints__
+def get_valid_content_types() -> Tuple[Type, ...]:
+    # Directly return the types from the TypeVar definition as a tuple
+    return (ImageContent, TextContent, FileContent, EmbeddedResource, ErrorData)
 
 
 def validate_tool_output(func):
     @functools.wraps(func)
-    async def wrapper(*args: Any, **kwargs: Any) -> List[ContentT]:
+    async def wrapper(*args: Any, **kwargs: Any) -> Sequence[Union[ImageContent, TextContent, FileContent, EmbeddedResource, ErrorData]]:
         result = await func(*args, **kwargs)
 
         # Validate result type
@@ -46,7 +43,7 @@ class BaseTool(ABC):
     input_schema: dict[str, Any] = Field(..., alias='inputSchema')
 
     @validate_tool_output
-    async def run(self, arguments: Dict[str, Any]) -> List[ContentT]:
+    async def run(self, arguments: Dict[str, Any]) -> Sequence[Union[ImageContent, TextContent, FileContent, EmbeddedResource, ErrorData]]:
         """Execute the tool with the given arguments"""
         # Try execute method first
         if hasattr(self, 'execute'):
@@ -59,7 +56,7 @@ class BaseTool(ABC):
         raise NotImplementedError("Tool must implement either 'run' or 'execute' async method")
 
     @validate_tool_output
-    async def execute(self, arguments: Dict[str, Any]) -> List[ContentT]:
+    async def execute(self, arguments: Dict[str, Any]) -> Sequence[Union[ImageContent, TextContent, FileContent, EmbeddedResource, ErrorData]]:
         """Alternative name for run method"""
         # Try run method first
         if hasattr(self, 'run'):

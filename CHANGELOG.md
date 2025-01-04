@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-python/tree/master).
 
+
+## [0.0.7] - 2025-01-05
+
+### Added
+- test which covere decoretor @validate_tool_output - used to check if user return only valid list of elements types
+- added FileContent whcih return encoded base64 file content and mime of this file
+- added in ResourceContents mandatory `name` attribute and optional `description` attribute - as servere needs to be able idenitfy resource also by the `name` (which will work as `id` in database)
+
+### Fixed
+- run/execute should return Sequence (which is covariant) instead of List (which is invariant) - that should fully allow return mix of types whit no linter warnings
+
+## [0.0.6] - 2025-01-04
+
+### Added
+- allow List of mixtures of ContentT to be returned from tool
+
 ## [0.0.5] - 2025-01-03
 
 ### Fixed
