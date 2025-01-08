@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='simpletool',
-      version='0.0.12',
+      version='0.0.13',
       description='simpletool',
       url='https://github.com/nchekwa/simpletool-python/tree/master',
       author='Artur Zdolinski',

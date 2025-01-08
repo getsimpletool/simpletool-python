@@ -9,7 +9,8 @@ from simpletool.types import (
     ImageContent,
     FileContent,
     ResourceContent,
-    ErrorContent
+    ErrorContent,
+    BoolContent
 )
 
 
@@ -132,3 +133,21 @@ def test_error_data():
     assert error.code == 404
     assert error.message == "Resource not found"
     assert error.data == {"details": "Additional error info"}
+
+
+def test_bool_content():
+    """Test BoolContent model."""
+    bool_content = BoolContent(type="blob", bool=True)
+    assert bool_content.type == "blob"
+    assert bool_content.bool is True
+
+    bool_content_from_bool = BoolContent(**{"bool": True})
+    assert bool_content_from_bool.bool is True
+
+    bool_content_with_desc = BoolContent(
+        type="blob", 
+        bool=False, 
+        description="A boolean content"
+    )
+    assert bool_content_with_desc.bool is False
+    assert bool_content_with_desc.description == "A boolean content"

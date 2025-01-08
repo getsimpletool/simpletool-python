@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-python/tree/master).
 
+# [0.0.13] - 2025-01-08 Milestone Alpha2
+
+## Fixed
+- Updated test import from `BoolContents` to `BoolContent` to match type definition
+
 
 # [0.0.12] - 2025-01-08 Milestone Alpha2
 

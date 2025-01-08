@@ -20,7 +20,7 @@ from simpletool.types import (
     ResourceContent, 
     ErrorContent,
     Content,
-    BoolContents
+    BoolContent
 )
 from simpletool.errors import ValidationError
 
@@ -45,7 +45,7 @@ def test_get_valid_content_types():
     """Test get_valid_content_types function."""
     valid_types = get_valid_content_types()
     assert len(valid_types) == 7
-    assert set(valid_types) == {Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContents, ErrorContent}
+    assert set(valid_types) == {Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent}
 
 
 def test_validate_tool_output_decorator():

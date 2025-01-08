@@ -13,7 +13,7 @@ from typing import List, Dict, Any, Union, Type, Literal, Sequence, Tuple, get_a
 from typing import Optional, TypeVar, AnyStr, Callable, Awaitable, Coroutine, ClassVar   # noqa: F401, F403
 from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
-from .types import Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContents, ErrorContent
+from .types import Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent
 from .models import SimpleInputModel
 from .schema import NoTitleDescriptionJsonSchema
 from .errors import SimpleToolError, ValidationError
@@ -21,12 +21,12 @@ from .errors import SimpleToolError, ValidationError
 
 def get_valid_content_types() -> Tuple[Type, ...]:
     """Directly return the types from the TypeVar definition as a tuple"""
-    return (Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContents, ErrorContent)
+    return (Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent)
 
 
 def validate_tool_output(func):
     @functools.wraps(func)
-    async def wrapper(*args: Any, **kwargs: Any) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContents, ErrorContent]]:
+    async def wrapper(*args: Any, **kwargs: Any) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
         result = await func(*args, **kwargs)
         if not isinstance(result, list):
             raise ValidationError("output", "Tool output must be a list")
@@ -204,7 +204,7 @@ class SimpleTool(ABC):
 
     @validate_tool_output
     @set_timeout(DEFAULT_TIMEOUT)
-    async def run(self, arguments: Dict[str, Any]) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContents, ErrorContent]]:
+    async def run(self, arguments: Dict[str, Any]) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
         """
         Execute the tool with the given arguments.
 
@@ -250,7 +250,7 @@ class SimpleTool(ABC):
             # No timeout if _timeout is 0 or negative
             return await self._run_implementation(validated_arguments)
 
-    async def _run_implementation(self, arguments: SimpleInputModel) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContents, ErrorContent]]:
+    async def _run_implementation(self, arguments: SimpleInputModel) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
         """
         Actual implementation of the tool's run method.
         Must be implemented by child classes.
@@ -263,7 +263,7 @@ class SimpleTool(ABC):
         """
         raise SimpleToolError(f"Subclass {self.__class__.__name__} must implement _run_implementation method")
 
-    async def __call__(self, arguments: Dict[str, Any]) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContents, ErrorContent]]:
+    async def __call__(self, arguments: Dict[str, Any]) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
         """Alias for run method"""
         return await self.run(arguments)
 

@@ -123,7 +123,7 @@ class ErrorContent(Content):
     model_config = ConfigDict(extra="allow")
 
 
-class BoolContents(Content):
+class BoolContent(Content):
     type: Literal["blob"] = "blob"  # type: ignore
     bool: bool
     description: Optional[str] | None = None
