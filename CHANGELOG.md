@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-python/tree/master).
 
 
+# [0.0.12] - 2025-01-08 Milestone Alpha2
+
+### Added
+- added `input_model` will be mandatory - as mapping SimpleInputModel to SimpleTool
+- `input_schema` will be from now generated based on `input_model` (and will not be able to be ovveriden)
+- added `output_model` + `output_schema` will be generated based on return type of `run` method
+- types for return (1 base + 6 subclasses):
+  - Content - base class
+  - TextContent - for text based content
+  - ImageContent - for image based content
+  - FileContent - for file based content
+  - ResourceContent - for resource based content
+  - BoolContent - for boolean based content
+  - ErrorContent - for error based content
+
+
+# [0.0.10] - 2025-01-06 Milestone Alpha
+
+### Added
+- ready to use own SimpleTool class naming convention
+- added empty __main__ to load module smoothly w/o any errors
+- adding a context manager for resource cleanup (auto clean in __aexit__ method)
+- implement timeout mechanisms for long-running tools
+- remove `execute` def option from Tool class - make it SIMPLE -> handled by `run` method option (only)
+- added own SimpleInputSchema class which is used to extract json schema from input types
+- by default json schema extraction for SimpleInputSchema will remove `title` and `description` fields
+
 ## [0.0.7] - 2025-01-05
 
 ### Added

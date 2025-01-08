@@ -1,0 +1,47 @@
+----------------------------------------------------------------------
+MyTool Return Value:
+type: <class 'list'>
+[TextContent(type='text', text='You said: Hello, world!')]
+----------------------------------------------------------------------
+String Representation - str(my_tool):
+Type: <class 'str'>
+{"name": "my_tool", "description": "A tool for testing", "input_schema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}
+
+Tool Details - my_tool.info:
+Type: <class 'str'>
+{
+    "name": "my_tool",
+    "description": "A tool for testing",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "text": {
+                "type": "string"
+            }
+        },
+        "required": [
+            "text"
+        ]
+    }
+}
+
+Dictionary Representation - my_tool.to_dict:
+Type: <class 'dict'>
+{'name': 'my_tool', 'description': 'A tool for testing', 'input_schema': {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text']}}
+----------------------------------------------------------------------
+Input: MODEL:
+Type: <class 'pydantic._internal._model_construction.ModelMetaclass'>
+<class '__main__.MyInputModel'>
+
+Input: SCHEMA:
+Type: <class 'dict'>
+{'properties': {'text': {'type': 'string'}}, 'required': ['text'], 'type': 'object'}
+
+Output: MODEL:
+Type: <class 'typing._GenericAlias'>
+typing.List[simpletool.types.TextContent]
+
+Output: SCHEMA:
+Type: <class 'dict'>
+{'type': 'array', 'items': {'oneOf': [{'additionalProperties': True, 'description': 'Text content for a message.', 'properties': {'type': {'const': 'text', 'default': 'text', 'title': 'Type', 'type': 'string'}, 'text': {'title': 'Text', 'type': 'string'}}, 'required': ['text'], 'title': 'TextContent', 'type': 'object'}]}}
+----------------------------------------------------------------------
