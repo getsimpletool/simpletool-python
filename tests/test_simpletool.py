@@ -140,7 +140,7 @@ def test_simpletool_repr():
     tool = TestSimpleTool()
     repr_str = repr(tool)
     
-    assert repr_str == "SimpleTool(name='TestTool', description=A tool for testing)"
+    assert repr_str == "TestSimpleTool(name='TestTool', description='A tool for testing', input_schema={'properties': {'test_field': {'type': 'string'}}, 'required': ['test_field'], 'type': 'object'})"
 
 
 def test_simpletool_async_context_manager():

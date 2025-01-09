@@ -1,6 +1,6 @@
 """ Type definitions for the simpletool package."""
-from typing import Union, Type
-from pydantic import BaseModel, model_validator
+from typing import Union, Type, Optional
+from pydantic import BaseModel, model_validator, Field
 
 
 class SimpleInputModel(BaseModel):
@@ -29,3 +29,35 @@ class SimpleToolModel(BaseModel):
     name: str
     description: Union[str, None] = None
     input_model: Type[SimpleInputModel]
+
+
+class SimpleToolResponseModel(BaseModel):
+    """
+    Response model for the tools endpoint.
+
+    Attributes:
+        name (str): The name of the tool.
+        description (str): A description of the tool's functionality.
+        input_schema (Optional[dict]): The input schema for the tool, if available.
+    """
+    name: str = Field(..., description="Name of the tool")
+    description: str = Field(..., description="Description of the tool's functionality")
+    input_schema: Optional[dict] = Field(None, description="Input schema for the tool, if available")
+
+    # def __repr__(self):
+    #   return f"SimpleTool(name='{self.name}', description='{self.description}', input_schema={self.input_schema})"
+
+    class Config:
+        """Pydantic model configuration."""
+        schema_extra = {
+            "example": {
+                "name": "example_tool",
+                "description": "An example tool for demonstration",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "input": {"type": "string"}
+                    }
+                }
+            }
+        }

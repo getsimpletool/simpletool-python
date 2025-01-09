@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-python/tree/master).
 
+
+# [0.0.14] - 2025-01-09 Milestone Alpha2
+
+## Added
+- SimpleToolResponseModel
+- add correct handle __repr__ for SimpleTool child classes
+- add get_version for `setup.py` to automate version update
+- auto add annotation version in `__init__.py`
+
 # [0.0.13] - 2025-01-08 Milestone Alpha2
 
 ## Fixed

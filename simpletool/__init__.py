@@ -1,5 +1,7 @@
 """
-This module contains the base class for all simple tools.
+name: SimpleTools
+author: Artur Zdolinski
+version: 
 """
 import asyncio
 import os
@@ -14,7 +16,7 @@ from typing import Optional, TypeVar, AnyStr, Callable, Awaitable, Coroutine, Cl
 from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
 from .types import Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent
-from .models import SimpleInputModel
+from .models import SimpleInputModel, SimpleToolResponseModel
 from .schema import NoTitleDescriptionJsonSchema
 from .errors import SimpleToolError, ValidationError
 
@@ -200,7 +202,16 @@ class SimpleTool(ABC):
         }).encode("utf-8").decode("unicode_escape")
 
     def __repr__(self):
-        return f"SimpleTool(name='{self.name}', description={self.description})"
+        # Create a SimpleToolResponseModel internally
+        response_model = SimpleToolResponseModel(
+            name=self.name,
+            description=self.description,
+            input_schema=self.input_schema
+        )
+        # Get the original repr
+        original_repr = repr(response_model)
+        # Replace with the actual child class name
+        return original_repr.replace("SimpleToolResponseModel", self.__class__.__name__)
 
     @validate_tool_output
     @set_timeout(DEFAULT_TIMEOUT)
