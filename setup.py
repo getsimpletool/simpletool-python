@@ -41,6 +41,10 @@ setup(name='simpletool',
       install_requires=['pydantic>=2.0.0', 'typing-extensions', 'pydantic>=2.10.4'],
       long_description=open('README.md').read(),
       long_description_content_type='text/markdown',
+      package_data={
+          'simpletool': ['CHANGELOG.md'],
+      },
+      include_package_data=True,
       classifiers=[
           'License :: OSI Approved :: MIT License',
           'Programming Language :: Python :: 3',
