@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-python/tree/master).
 
+# [0.0.15] - 2025-01-09 Milestone Alpha2
+
+## Fixed
+- incorrect github action workflow for `setup.py` version
 
 # [0.0.14] - 2025-01-09 Milestone Alpha2
 
