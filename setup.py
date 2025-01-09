@@ -15,28 +15,77 @@ def get_version():
 
                     # Update version in __init__.py
                     init_path = os.path.join('simpletool', '__init__.py')
-                    with open(init_path, 'r', encoding='utf-8') as init_file:
-                        init_content = init_file.read()
+                    try:
+                        with open(init_path, 'r', encoding='utf-8') as init_file:
+                            init_content = init_file.read()
 
-                    # Replace version in the header
-                    updated_init_content = re.sub(
-                        r'(version:)\s*',
-                        r'\1 ' + version,
-                        init_content
-                    )
+                        # Replace version in the header
+                        updated_init_content = re.sub(
+                            r'version:\s*\d+\.\d+\.\d+',
+                            f'version: {version}',
+                            init_content
+                        )
 
-                    with open(init_path, 'w', encoding='utf-8') as init_file:
-                        init_file.write(updated_init_content)
+                        with open(init_path, 'w', encoding='utf-8') as init_file:
+                            init_file.write(updated_init_content)
 
+                    except Exception as e:
+                        print(f"Error updating __init__.py: {e}")
+
+                    print(f"Found version: {version}")
                     return version
+        print("No version found in CHANGELOG.md")
         return '0.0.0'  # fallback version if not found
     except FileNotFoundError:
         print("CHANGELOG.md not found!")
         return '0.0.0'
 
+def read_version_from_init():
+    """Read version from __init__.py as a fallback"""
+    try:
+        init_path = os.path.join('simpletool', '__init__.py')
+        with open(init_path, 'r', encoding='utf-8') as init_file:
+            init_content = init_file.read()
+            match = re.search(r'version:\s*(\d+\.\d+\.\d+)', init_content)
+            if match:
+                version = match.group(1)
+                print(f"Version from __init__.py: {version}")
+                return version
+    except Exception as e:
+        print(f"Error reading version from __init__.py: {e}")
+    return '0.0.0'
+
+def write_version_to_metadata(version):
+    """Write version to PKG-INFO metadata file"""
+    try:
+        with open('simpletool.egg-info/PKG-INFO', 'r') as f:
+            content = f.read()
+        
+        # Replace or add Version
+        if 'Version:' in content:
+            content = re.sub(r'Version:.*', f'Version: {version}', content)
+        else:
+            content += f'\nVersion: {version}\n'
+        
+        with open('simpletool.egg-info/PKG-INFO', 'w') as f:
+            f.write(content)
+        
+        print(f"Updated PKG-INFO with version: {version}")
+    except Exception as e:
+        print(f"Error writing version to metadata: {e}")
+
+# First try to get version from CHANGELOG.md
+version = get_version()
+
+# If that fails, try reading from __init__.py
+if version == '0.0.0':
+    version = read_version_from_init()
+
+# Write version to metadata
+write_version_to_metadata(version)
 
 setup(name='simpletool',
-      version=get_version(),
+      version=version,  # Use the version we found
       description='simpletool',
       url='https://github.com/nchekwa/simpletool-python/tree/master',
       author='Artur Zdolinski',

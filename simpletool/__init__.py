@@ -1,7 +1,7 @@
 """
 name: SimpleTools
 author: Artur Zdolinski
-version: 0.0.0
+version: 0.0.14
 """
 import asyncio
 import os
