@@ -10,22 +10,22 @@ def get_version():
         match = re.search(r'\[(\d+\.\d+\.\d+)\]', first_line)
         if match:
             version = match.group(1)
-            
+
             # Update version in __init__.py
             init_path = os.path.join('simpletool', '__init__.py')
             with open(init_path, 'r', encoding='utf-8') as init_file:
                 init_content = init_file.read()
-            
+
             # Replace version in the header
             updated_init_content = re.sub(
                 r'(version:)\s*',
                 r'\1 ' + version,
                 init_content
             )
-            
+
             with open(init_path, 'w', encoding='utf-8') as init_file:
                 init_file.write(updated_init_content)
-            
+
             return version
     return '0.0.0'  # fallback version if not found
 
