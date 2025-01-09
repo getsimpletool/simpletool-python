@@ -7,7 +7,7 @@ def get_version():
     # Read version from CHANGELOG.md
     with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
         first_line = f.readline().strip()
-        match = re.search(r'\[(\d+\.\d+\.\d+)\]', first_line)
+        match = re.search(r'# \[(\d+\.\d+\.\d+)\]', first_line)
         if match:
             version = match.group(1)
 
@@ -42,7 +42,7 @@ setup(name='simpletool',
       long_description=open('README.md').read(),
       long_description_content_type='text/markdown',
       package_data={
-          'simpletool': ['CHANGELOG.md'],
+          'simpletool': ['CHANGELOG.md', 'README.md', 'LICENSE'],
       },
       include_package_data=True,
       classifiers=[
