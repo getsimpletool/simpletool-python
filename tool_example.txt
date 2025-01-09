@@ -7,7 +7,7 @@ String Representation - str(my_tool):
 Type: <class 'str'>
 {"name": "my_tool", "description": "A tool for testing", "input_schema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}
 
-Tool Details - my_tool.info:
+Tool Details Print - my_tool.info:
 Type: <class 'str'>
 {
     "name": "my_tool",
@@ -25,9 +25,13 @@ Type: <class 'str'>
     }
 }
 
-Dictionary Representation - my_tool.to_dict:
+Dictionary - my_tool.to_dict:
 Type: <class 'dict'>
 {'name': 'my_tool', 'description': 'A tool for testing', 'input_schema': {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text']}}
+
+String Representation - repr(my_tool):
+Type: <class 'str'>
+MyTool(name='my_tool', description='A tool for testing', input_schema={'properties': {'text': {'type': 'string'}}, 'required': ['text'], 'type': 'object'})
 ----------------------------------------------------------------------
 Input: MODEL:
 Type: <class 'pydantic._internal._model_construction.ModelMetaclass'>

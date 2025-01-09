@@ -22,8 +22,8 @@ class MyTool(SimpleTool):
 
 
 async def main(t: str):
-    my_tool = MyTool()
-    return my_tool, await my_tool.run({"text": t})
+    mytool = MyTool()
+    return mytool, await mytool.run({"text": t})
 
 
 my_tool, r = asyncio.run(main("Hello, world!"))
@@ -47,7 +47,8 @@ print("\nDictionary - my_tool.to_dict:")
 print(f"Type: {type(my_tool.to_dict)}")
 print(my_tool.to_dict)
 
-print("\nRepresentation - my_tool.__repr__():")
+# Display the string representation of MyTool
+print("\nString Representation - repr(my_tool):")
 print(f"Type: {type(repr(my_tool))}")
 print(repr(my_tool))
 

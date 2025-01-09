@@ -44,9 +44,6 @@ class SimpleToolResponseModel(BaseModel):
     description: str = Field(..., description="Description of the tool's functionality")
     input_schema: Optional[dict] = Field(None, description="Input schema for the tool, if available")
 
-    # def __repr__(self):
-    #   return f"SimpleTool(name='{self.name}', description='{self.description}', input_schema={self.input_schema})"
-
     class Config:
         """Pydantic model configuration."""
         schema_extra = {
