@@ -5,34 +5,32 @@ import pytest
 from simpletool.errors import SimpleToolError, ValidationError
 
 
-def test_simple_tool_error():
-    """Test SimpleToolError initialization and attributes."""
-    error = SimpleToolError(
-        message="Test error", 
-        code=501, 
-        details={"context": "test"}
-    )
-    
-    assert str(error) == "Test error"
-    assert error.message == "Test error"
-    assert error.code == 501
-    assert error.details == {"context": "test"}
+@pytest.mark.parametrize("error_class,input_data,expected", [
+    (
+        SimpleToolError,
+        {"message": "Test error", "code": 501, "details": {"context": "test"}},
+        {"str": "Test error", "code": 501, "details": {"context": "test"}}
+    ),
+    (
+        SimpleToolError,
+        {"message": "Default error"},
+        {"str": "Default error", "code": 500, "details": {}}
+    ),
+])
+def test_error_initialization(error_class, input_data, expected):
+    """Test error class initialization with various inputs."""
+    error = error_class(**input_data)
 
-
-def test_simple_tool_error_default_values():
-    """Test SimpleToolError with default values."""
-    error = SimpleToolError("Default error")
-    
-    assert str(error) == "Default error"
-    assert error.message == "Default error"
-    assert error.code == 500
-    assert error.details == {}
+    assert str(error) == expected["str"]
+    assert error.message == expected["str"]
+    assert error.code == expected["code"]
+    assert error.details == expected["details"]
 
 
 def test_validation_error():
     """Test ValidationError initialization."""
     error = ValidationError(field="test_field", reason="Invalid input")
-    
+
     assert str(error) == "Validation failed for field 'test_field': Invalid input"
     assert error.message == "Validation failed for field 'test_field': Invalid input"
     assert error.code == 400

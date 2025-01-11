@@ -46,15 +46,18 @@ class SimpleToolResponseModel(BaseModel):
 
     class Config:
         """Pydantic model configuration."""
-        schema_extra = {
-            "example": {
-                "name": "example_tool",
-                "description": "An example tool for demonstration",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "input": {"type": "string"}
+        model_config = {
+            "json_schema_extra": {
+                "example": {
+                    "name": "example_tool",
+                    "description": "An example tool for demonstration",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "input": {"type": "string"}
+                        }
                     }
                 }
-            }
+            },
+            "from_attributes": True  # Enables serialization from other types
         }

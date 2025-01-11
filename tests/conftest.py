@@ -20,5 +20,5 @@ def pytest_collection_modifyitems(config, items):
         warnings.filterwarnings(
             "ignore",
             category=pytest.PytestCollectionWarning,
-            message=f"{item} cannot collect test class .* because it has a __init__ constructor"
+            message=r".*cannot collect test class .* because it has a __init__ constructor"
         )
