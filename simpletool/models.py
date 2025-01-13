@@ -40,8 +40,17 @@ class SimpleToolResponseModel(BaseModel):
         description (str): A description of the tool's functionality.
         input_schema (Optional[dict]): The input schema for the tool, if available.
     """
-    name: str = Field(..., description="Name of the tool")
-    description: str = Field(..., description="Description of the tool's functionality")
+    name: str = Field(
+        ...,
+        description="Name of the tool",
+        pattern="^[a-zA-Z0-9_-]+$",
+        max_length=64
+    )
+    description: str = Field(
+        ...,
+        description="Description of the tool's functionality",
+        max_length=1024
+    )
     input_schema: Optional[dict] = Field(None, description="Input schema for the tool, if available")
 
     class Config:

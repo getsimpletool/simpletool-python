@@ -20,6 +20,10 @@ def test_text_content():
     assert text_content.type == "text"
     assert text_content.text == "Hello, World!"
 
+    # Test string input validation
+    text_content_from_str = TextContent.validate_or_convert("Direct string input")
+    assert text_content_from_str == {"text": "Direct string input"}
+
 
 def test_image_content_valid():
     """Test valid ImageContent."""
@@ -27,11 +31,11 @@ def test_image_content_valid():
     base64_image = base64.b64encode(b"test image data").decode('utf-8')
     image_content = ImageContent(
         type="image",
-        data=base64_image,
+        image=base64_image,
         mime_type="image/png"
     )
     assert image_content.type == "image"
-    assert image_content.data == base64_image
+    assert image_content.image == base64_image
     assert image_content.mime_type == "image/png"
 
 
@@ -39,7 +43,7 @@ def test_image_content_camel_case_conversion():
     """Test camelCase to snake_case conversion for ImageContent."""
     image_content = ImageContent(**{
         "type": "image",
-        "data": base64.b64encode(b"test").decode('utf-8'),
+        "image": base64.b64encode(b"test").decode('utf-8'),
         "mimeType": "image/jpeg"
     })
     assert image_content.mime_type == "image/jpeg"
@@ -48,7 +52,18 @@ def test_image_content_camel_case_conversion():
 def test_image_content_invalid_base64():
     """Test ImageContent with invalid base64 data."""
     with pytest.raises(PydanticValidationError):
-        ImageContent(type="image", data="not-base64-data")
+        ImageContent(type="image", image="not-base64-data")
+
+
+def test_image_content_direct_base64():
+    """Test ImageContent with direct base64 string input."""
+    base64_str = base64.b64encode(b"test direct data").decode('utf-8')
+    image_data = ImageContent.validate_or_convert(base64_str)
+    assert image_data == {"image": base64_str}
+
+    # Test invalid base64 input
+    with pytest.raises(ValueError, match="Image must be a valid base64 encoded string"):
+        ImageContent.validate_or_convert("invalid base64 string")
 
 
 def test_file_content_valid():
@@ -56,12 +71,12 @@ def test_file_content_valid():
     base64_file = base64.b64encode(b"test file data").decode('utf-8')
     file_content = FileContent(
         type="file",
-        data=base64_file,
+        file=base64_file,
         file_name="test.txt",
         mime_type="text/plain"
     )
     assert file_content.type == "file"
-    assert file_content.data == base64_file
+    assert file_content.file == base64_file
     assert file_content.file_name == "test.txt"
     assert file_content.mime_type == "text/plain"
 
@@ -71,7 +86,7 @@ def test_file_content_camel_case_conversion():
     base64_file = base64.b64encode(b"test").decode('utf-8')
     file_content = FileContent(**{
         "type": "file",
-        "data": base64_file,
+        "file": base64_file,
         "fileName": "test.txt",
         "mimeType": "text/plain"
     })
@@ -82,7 +97,18 @@ def test_file_content_camel_case_conversion():
 def test_file_content_invalid_base64():
     """Test FileContent with invalid base64 data."""
     with pytest.raises(PydanticValidationError):
-        FileContent(type="file", data="not-base64-data")
+        FileContent(type="file", file="not-base64-data")
+
+
+def test_file_content_direct_base64():
+    """Test FileContent with direct base64 string input."""
+    base64_str = base64.b64encode(b"test direct file data").decode('utf-8')
+    file_data = FileContent.validate_or_convert(base64_str)
+    assert file_data == {"file": base64_str}
+
+    # Test invalid base64 input
+    with pytest.raises(ValueError, match="File must be a valid base64 encoded string"):
+        FileContent.validate_or_convert("invalid base64 string")
 
 
 def test_resource_contents():
@@ -123,15 +149,22 @@ def test_blob_resource_contents():
     assert blob_resource.blob is not None
 
 
+def test_resource_content_direct_input():
+    """Test ResourceContent with direct string input."""
+    uri = "https://example.com/resource"
+    resource_data = ResourceContent.validate_or_convert(uri)
+    assert resource_data == {"uri": uri, "name": uri}
+
+
 def test_error_data():
     """Test ErrorContent model."""
     error = ErrorContent(
         code=404,
-        message="Resource not found",
+        error="Resource not found",
         data={"details": "Additional error info"}
     )
     assert error.code == 404
-    assert error.message == "Resource not found"
+    assert error.error == "Resource not found"
     assert error.data == {"details": "Additional error info"}
 
 
@@ -151,3 +184,12 @@ def test_bool_content():
     )
     assert bool_content_with_desc.bool is False
     assert bool_content_with_desc.description == "A boolean content"
+
+
+def test_bool_content_direct_input():
+    """Test BoolContent with direct boolean input."""
+    bool_data = BoolContent.validate_or_convert(True)
+    assert bool_data == {"bool": True}
+
+    bool_data_false = BoolContent.validate_or_convert(False)
+    assert bool_data_false == {"bool": False}

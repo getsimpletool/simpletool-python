@@ -93,7 +93,7 @@ def test_set_timeout_decorator():
     assert len(result) == 1
     assert isinstance(result[0], ErrorContent)
     assert result[0].code == 408
-    assert "timed out" in result[0].message
+    assert "timed out" in result[0].error
 
     # Test non-timeout
     result = asyncio.run(fast_tool())
@@ -232,7 +232,7 @@ class AdvancedSimpleTool(SimpleTool):
         if not arguments.get('optional_field'):
             return [ErrorContent(
                 code=400, 
-                message="Optional field is required", 
+                error="Optional field is required", 
                 data={"input": arguments}
             )]
         return [TextContent(type="text", text=str(arguments['optional_field']))]

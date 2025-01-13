@@ -9,7 +9,8 @@ def get_version():
         with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
-                match = re.search(r'# \[(\d+\.\d+\.\d+)\]', line)
+                # Modified pattern to match both # [...] and ## [...]
+                match = re.search(r'^#{1,2}\s*\[(\d+\.\d+\.\d+)\]', line)
                 if match:
                     version = match.group(1)
 
@@ -40,6 +41,7 @@ def get_version():
         print("CHANGELOG.md not found!")
         return '0.0.0'
 
+
 def read_version_from_init():
     """Read version from __init__.py as a fallback"""
     try:
@@ -55,24 +57,26 @@ def read_version_from_init():
         print(f"Error reading version from __init__.py: {e}")
     return '0.0.0'
 
+
 def write_version_to_metadata(version):
     """Write version to PKG-INFO metadata file"""
     try:
         with open('simpletool.egg-info/PKG-INFO', 'r') as f:
             content = f.read()
-        
+
         # Replace or add Version
         if 'Version:' in content:
             content = re.sub(r'Version:.*', f'Version: {version}', content)
         else:
             content += f'\nVersion: {version}\n'
-        
+
         with open('simpletool.egg-info/PKG-INFO', 'w') as f:
             f.write(content)
-        
+
         print(f"Updated PKG-INFO with version: {version}")
     except Exception as e:
         print(f"Error writing version to metadata: {e}")
+
 
 # First try to get version from CHANGELOG.md
 version = get_version()
@@ -92,7 +96,7 @@ setup(name='simpletool',
       author_email='contact@nchekwa.com',
       license='MIT',
       packages=['simpletool'],
-      install_requires=['pydantic>=2.0.0', 'typing-extensions', 'pydantic>=2.10.4'],
+      install_requires=['pydantic>=2.10.4', 'typing-extensions'],
       long_description=open('README.md').read(),
       long_description_content_type='text/markdown',
       package_data={

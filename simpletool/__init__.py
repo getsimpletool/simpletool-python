@@ -12,7 +12,7 @@ import logging
 from functools import wraps
 from abc import ABC
 from typing import List, Dict, Any, Union, Type, Literal, Sequence, Tuple, get_args
-from typing import Optional, TypeVar, AnyStr, Callable, Awaitable, Coroutine, ClassVar   # noqa: F401, F403
+from typing import Optional, TypeVar, AnyStr, Callable, Awaitable, Coroutine, ClassVar, TypeAlias   # noqa: F401, F403
 from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
 from .types import Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent
@@ -50,7 +50,7 @@ def set_timeout(seconds):
             except asyncio.TimeoutError:
                 return [ErrorContent(
                     code=408,  # Request Timeout
-                    message=f"Tool execution timed out after {seconds} seconds",
+                    error=f"Tool execution timed out after {seconds} seconds",
                     data={"timeout": seconds}
                 )]
         return wrapper
@@ -238,7 +238,7 @@ class SimpleTool(ABC):
         except ValidationError as e:
             return [ErrorContent(
                 code=400,  # Bad Request
-                message=f"Input validation error: {str(e)}",
+                error=f"Input validation error: {str(e)}",
                 data={"validation_error": str(e)}
             )]
 
@@ -254,7 +254,7 @@ class SimpleTool(ABC):
             except asyncio.TimeoutError:
                 return [ErrorContent(
                     code=408,  # Request Timeout
-                    message=f"Tool execution timed out after {self._timeout} seconds",
+                    error=f"Tool execution timed out after {self._timeout} seconds",
                     data={"timeout": self._timeout}
                 )]
         else:
@@ -338,7 +338,7 @@ class SimpleTool(ABC):
 
     @property
     def to_dict(self) -> Dict[str, Any]:
-        """Return a dictionary representation of the tool."""
+        """Convert content to a dictionary representation"""
         sorted_input_schema = self._sort_input_schema(self.input_schema)
         return {
             "name": self.name,

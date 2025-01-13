@@ -55,6 +55,20 @@ def test_simple_input_model_camel_case_conversion():
     assert model.camel_case_field == "another test value"
 
 
+def test_simple_input_model_without_input_schema():
+    """Test conversion when inputSchema is not present."""
+    data = {"someField": "test value"}
+    result = SimpleInputModel._convert_camel_to_snake_names(data)
+    assert result == {"someField": "test value"}
+    assert "input_schema" not in result
+
+def test_simple_input_model_with_input_schema():
+    """Test conversion when inputSchema is present."""
+    data = {"inputSchema": {"type": "object"}}
+    result = SimpleInputModel._convert_camel_to_snake_names(data)
+    assert "inputSchema" not in result
+    assert result["input_schema"] == {"type": "object"}
+
 def test_simple_tool_model():
     """Test SimpleToolModel initialization."""
     tool_model = SimpleToolModel(

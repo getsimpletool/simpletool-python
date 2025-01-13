@@ -5,31 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-python/tree/master).
 
-# [0.0.16] - 2025-01-11 Milestone Alpha2
+## [0.0.17] - 2025-01-13 Milestone Alpha2
 
-## Fixed
+### Added
+- add `name` and `description` validation Field rules in `SimpleToolResponseModel`
+- add str to `ResourceConent`-*uri* field to match rfc3986 uris
+
+### Changed
+- `ImageContent` - rename *data* -> *image*
+- `FileContent` - rename *data* -> *file*
+- `ErrorContent` - rename *message* -> *error*
+
+## [0.0.16] - 2025-01-11 Milestone Alpha2
+
+### Fixed
 - incorrect `SimpleToolResponseModel` Pydantic model configuration + from_attributes allow easy serialize/deserialize
 
-# [0.0.15] - 2025-01-09 Milestone Alpha2
+## [0.0.15] - 2025-01-09 Milestone Alpha2
 
-## Fixed
+### Fixed
 - incorrect github action workflow for `setup.py` version
 
-# [0.0.14] - 2025-01-09 Milestone Alpha2
+## [0.0.14] - 2025-01-09 Milestone Alpha2
 
-## Added
+### Added
 - SimpleToolResponseModel
 - add correct handle __repr__ for SimpleTool child classes
 - add get_version for `setup.py` to automate version update
 - auto add annotation version in `__init__.py`
 
-# [0.0.13] - 2025-01-08 Milestone Alpha2
+## [0.0.13] - 2025-01-08 Milestone Alpha2
 
-## Fixed
+### Fixed
 - Updated test import from `BoolContents` to `BoolContent` to match type definition
 
 
-# [0.0.12] - 2025-01-08 Milestone Alpha2
+## [0.0.12] - 2025-01-08 Milestone Alpha2
 
 ### Added
 - added `input_model` will be mandatory - as mapping SimpleInputModel to SimpleTool
