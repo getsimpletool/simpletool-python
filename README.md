@@ -2,7 +2,12 @@
 
 SimpleTool is a lightweight, async-first Python framework designed for creating simple, strict, and explicit type-safe tools with minimal complexity. It embodies some of the Python design Zen principles, such as "Simple is better than complex" and "Explicit is better than implicit".
 
-## Overview
+## ⚠️ Disclaimer [2025-01]
+
+* 🛠️ __Under active development__: Expect frequent updates, bugs, and breaking changes.
+* 🤓 __Check the release notes__: Always check the [release notes](./CHANGELOG.md) to verify if there are any breaking changes.
+
+## 💡 Overview
 
 Simpletool is a powerful SDK that provides a structured approach to building tools with:
 - Standardized input and output content types
@@ -11,10 +16,12 @@ Simpletool is a powerful SDK that provides a structured approach to building too
 - Environment variable handling
 - Timeout management (def. 60s)
 
-## Example
+
+
+## 💬 Example
 Check out the [tool_example.py](./tool_example.py) to see how to use Simpletool to create a simple, type-safe tool.
 
-## Architecture Overview
+## ⚡️ Architecture Overview
 
 ```mermaid
 
@@ -75,7 +82,7 @@ classDiagram
     SimpleTool --> Content: returns Sequence[Content]
 ```
 
-## Core Components
+## 💻 Core Components
 
 ### `SimpleTool` Base Class and Key Features
 
@@ -116,7 +123,7 @@ Simpletool defines several content types to standardize tool inputs and outputs:
 - `ErrorContent`: Provides structured error reporting
 - `BoolContents`: Simple boolean content type
 
-## Installation
+## 📦 Installation
 
 Install the package using pip:
 
@@ -124,9 +131,9 @@ Install the package using pip:
 pip install simpletool
 ```
 
-## Quick Start
+## 🔄 Quick Start
 
-### Creating a Tool
+### 🛠️ Creating a Tool
 
 ```python
 from simpletool import SimpleTool, SimpleInputModel, Sequence, Field
@@ -147,7 +154,7 @@ class MyTool(SimpleTool):
         return [TextContent(text=f"Hello, {arg.name}!")]
 ```
 
-## Development Guidelines
+## 📝 Development Guidelines
 
 - Inherit Tool model from `SimpleTool`
 - Define an `input_model` using Pydantic (`SimpleInputModel`)
@@ -156,14 +163,14 @@ class MyTool(SimpleTool):
 - Use async/await for asynchronous operations
 
 
-## Contributing
+## 📝 Contributing
 
 Contributions are welcome! Please follow Python best practices and maintain the existing code style.
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License.
 
-## Contact
+## 📞 Contact
 
 Contributions are welcome! Please submit a pull request with your changes.
