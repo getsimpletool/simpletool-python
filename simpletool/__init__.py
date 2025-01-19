@@ -9,6 +9,7 @@ import random
 import json
 import functools
 import logging
+import re
 from functools import wraps
 from abc import ABC
 from typing import List, Dict, Any, Union, Type, Literal, Sequence, Tuple, get_args
@@ -19,6 +20,8 @@ from .types import Content, TextContent, ImageContent, FileContent, ResourceCont
 from .models import SimpleInputModel, SimpleToolResponseModel
 from .schema import NoTitleDescriptionJsonSchema
 from .errors import SimpleToolError, ValidationError
+import sys
+from pathlib import Path
 
 
 def get_valid_content_types() -> Tuple[Type, ...]:
@@ -59,8 +62,17 @@ def set_timeout(seconds):
 
 class SimpleTool(ABC):
     """Base class for all simple tools. """
-    name: str = Field(..., description="Name of the tool")
-    description: str = Field("This tool does not have a description", description="Description of the tool")
+    name: str = Field(
+        ...,
+        description="Name of the tool",
+        pattern="^[a-zA-Z0-9_-]+$",
+        max_length=64
+    )
+    description: str = Field(
+        ...,
+        description="Description of the tool's functionality",
+        max_length=1024
+    )
     input_model: ClassVar[Type[SimpleInputModel]]  # Class-level input model
 
     # Add default timeout configuration
@@ -70,6 +82,24 @@ class SimpleTool(ABC):
         """
         Initialize SimpleTool.
         """
+        # Validate name and description
+        if not hasattr(self, 'name') or not isinstance(self.name, str):
+            raise ValidationError("name", "Tool must have a name attribute of type str")
+
+        if not hasattr(self, 'description') or not isinstance(self.description, str):
+            raise ValidationError("description", "Tool must have a description attribute of type str")
+
+        # Validate name pattern and length
+
+        if not re.match("^[a-zA-Z0-9_-]+$", self.name):
+            raise ValidationError("name", "Tool name must contain only alphanumeric characters, underscores, and hyphens")
+        if len(self.name) > 64:
+            raise ValidationError("name", "Tool name cannot exceed 64 characters")
+
+        # Validate description length
+        if len(self.description) > 1024:
+            raise ValidationError("description", "Tool description cannot exceed 1024 characters")
+
         # Validate input_model is defined at the class level
         if not hasattr(self.__class__, 'input_model') or not issubclass(self.__class__.input_model, SimpleInputModel):
             raise ValidationError("input_model", f"Subclass {self.__class__.__name__} must define a class-level 'input_model' as a subclass of SimpleInputModel")
@@ -196,8 +226,8 @@ class SimpleTool(ABC):
         """Return a one-line JSON string representation of the tool."""
         sorted_input_schema = self._sort_input_schema(self.input_schema)
         return json.dumps({
-            "name": self.name,
-            "description": self.description,
+            "name": str(self.name),
+            "description": str(self.description),
             "input_schema": sorted_input_schema
         }).encode("utf-8").decode("unicode_escape")
 
@@ -434,3 +464,29 @@ class SimpleTool(ABC):
 
         # Propagate any original exceptions
         return False
+
+    def __reduce__(self):
+        """Make SimpleTool picklable by only serializing essential attributes."""
+        # Get module name from the module path
+        module = sys.modules.get(self.__class__.__module__)
+        module_file = getattr(module, '__file__', None) if module else None
+        if module_file and isinstance(module_file, str):
+            # Use the actual module file name without .py extension
+            module_name = Path(module_file).stem
+            self.__class__.__module__ = module_name
+        else:
+            # Fallback to tool name only if we really have to
+            self.__class__.__module__ = self.name
+
+        return (self.__class__, (), {
+            'name': self.name,
+            'description': self.description,
+            'input_schema': getattr(self, 'input_schema', None),
+            'output_schema': getattr(self, 'output_schema', None),
+            '_timeout': getattr(self, '_timeout', self.DEFAULT_TIMEOUT)
+        })
+
+    def __setstate__(self, state):
+        """Restore state after unpickling."""
+        for key, value in state.items():
+            setattr(self, key, value)

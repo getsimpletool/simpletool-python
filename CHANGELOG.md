@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-python/tree/master).
 
+
+## [0.0.19] - 2025-01-19 Milestone Alpha2
+
+### Added
+- Make SimpleTool picklable by only serializing essential attributes
+
+## [0.0.18] - 2025-01-13 Milestone Alpha2
+
+### Fixed
+- missing `SimpleTool` name and description validation rules
+
+
 ## [0.0.17] - 2025-01-13 Milestone Alpha2
 
 ### Added
