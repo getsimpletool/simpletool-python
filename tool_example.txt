@@ -22,6 +22,34 @@ Type: <class 'str'>
         "required": [
             "text"
         ]
+    },
+    "output_schema": {
+        "type": "array",
+        "items": {
+            "oneOf": [
+                {
+                    "additionalProperties": true,
+                    "description": "Text content for a message.",
+                    "properties": {
+                        "type": {
+                            "const": "text",
+                            "default": "text",
+                            "title": "Type",
+                            "type": "string"
+                        },
+                        "text": {
+                            "title": "Text",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "text"
+                    ],
+                    "title": "TextContent",
+                    "type": "object"
+                }
+            ]
+        }
     }
 }
 

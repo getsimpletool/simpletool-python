@@ -10,6 +10,7 @@ and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-p
 
 ### Added
 - Make SimpleTool picklable by only serializing essential attributes
+- add output_schema in info property
 
 ## [0.0.18] - 2025-01-13 Milestone Alpha2
 

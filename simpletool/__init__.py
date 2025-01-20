@@ -363,7 +363,8 @@ class SimpleTool(ABC):
         return json.dumps({
             "name": self.name,
             "description": self.description,
-            "input_schema": sorted_input_schema
+            "input_schema": sorted_input_schema,
+            "output_schema": self.output_schema
         }, indent=4)
 
     @property
