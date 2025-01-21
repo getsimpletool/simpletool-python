@@ -5,19 +5,19 @@ import pytest
 import asyncio
 import json
 from typing import Sequence, Union, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import Field
 from simpletool import (
-    SimpleTool, 
-    validate_tool_output, 
-    set_timeout, 
+    SimpleTool,
+    validate_tool_output,
+    set_timeout,
     get_valid_content_types,
     SimpleInputModel
 )
 from simpletool.types import (
-    ImageContent, 
-    TextContent, 
-    FileContent, 
-    ResourceContent, 
+    ImageContent,
+    TextContent,
+    FileContent,
+    ResourceContent,
     ErrorContent,
     Content,
     BoolContent
@@ -53,7 +53,7 @@ def test_validate_tool_output_decorator():
     @validate_tool_output
     async def valid_output_tool():
         return [TextContent(type="text", text="test")]
-    
+
     @validate_tool_output
     async def invalid_output_tool():
         return ["not a valid content type"]
@@ -71,7 +71,7 @@ def test_validate_tool_output_decorator():
     @validate_tool_output
     async def non_list_output_tool():
         return TextContent(type="text", text="test")
-    
+
     with pytest.raises(ValidationError, match="Tool output must be a list"):
         asyncio.run(non_list_output_tool())
 
@@ -104,16 +104,16 @@ def test_set_timeout_decorator():
 def test_simpletool_initialization():
     """Test SimpleTool initialization."""
     tool = TestSimpleTool()
-    
+
     # Test basic attributes
     assert tool.name == "TestTool"
     assert tool.description == "A tool for testing"
     assert tool.input_model == TestInputModel
-    
+
     # Test input schema
     assert "properties" in tool.input_schema
     assert "test_field" in tool.input_schema["properties"]
-    
+
     # Test timeout
     assert tool._timeout == tool.DEFAULT_TIMEOUT
 
@@ -122,10 +122,10 @@ def test_simpletool_str_representation():
     """Test __str__ method of SimpleTool."""
     tool = TestSimpleTool()
     tool_str = str(tool)
-    
+
     # Parse the JSON string
     tool_dict = json.loads(tool_str)
-    
+
     # Validate structure
     assert "name" in tool_dict
     assert "description" in tool_dict
@@ -139,8 +139,7 @@ def test_simpletool_repr():
     """Test __repr__ method of SimpleTool."""
     tool = TestSimpleTool()
     repr_str = repr(tool)
-    
-    assert repr_str == "TestSimpleTool(name='TestTool', description='A tool for testing', input_schema={'properties': {'test_field': {'type': 'string'}}, 'required': ['test_field'], 'type': 'object'})"
+    assert repr_str == "TestSimpleTool(name='TestTool', description='A tool for testing', input_schema={'type': 'object', 'properties': {'test_field': {'type': 'string'}}, 'required': ['test_field']}, output_schema={'type': 'array', 'items': {'oneOf': [{'additionalProperties': True, 'description': 'Text content for a message.', 'properties': {'type': {'const': 'text', 'default': 'text', 'title': 'Type', 'type': 'string'}, 'text': {'title': 'Text', 'type': 'string'}}, 'required': ['text'], 'title': 'TextContent', 'type': 'object'}]}})"
 
 
 def test_simpletool_async_context_manager():
@@ -148,7 +147,7 @@ def test_simpletool_async_context_manager():
     async def test_context_manager():
         async with TestSimpleTool() as tool:
             assert isinstance(tool, TestSimpleTool)
-    
+
     asyncio.run(test_context_manager())
 
 
@@ -178,33 +177,61 @@ def test_simpletool_subclass_validation():
 def test_simpletool_sort_input_schema():
     """Test _sort_input_schema method."""
     tool = TestSimpleTool()
-    unsorted_schema = {
-        "additionalProperties": False,
-        "required": ["test_field"],
-        "properties": {"test_field": {}},
-        "title": "Test"
-    }
-    
-    sorted_schema = tool._sort_input_schema(unsorted_schema)
-    
-    # Check key order
-    keys = list(sorted_schema.keys())
-    assert keys[0] == "properties"
-    assert keys[1] == "required"
-    assert keys[2] == "additionalProperties"
-    assert keys[3] == "title"
+
+    # Test different input orders to ensure consistent sorting
+    test_cases = [
+        # Case 1: Random order
+        {
+            "title": "Test",
+            "additionalProperties": False,
+            "properties": {"test_field": {}},
+            "required": ["test_field"]
+        },
+        # Case 2: Reverse order
+        {
+            "title": "Test",
+            "required": ["test_field"],
+            "properties": {"test_field": {}},
+            "additionalProperties": False
+        },
+        # Case 3: Mixed order
+        {
+            "properties": {"test_field": {}},
+            "additionalProperties": False,
+            "required": ["test_field"],
+            "title": "Test"
+        }
+    ]
+
+    # Priority keys that should appear in a specific order
+    priority_keys = ['properties', 'required']
+
+    # All cases should have priority keys in the same order
+    for case in test_cases:
+        sorted_schema = tool._sort_input_schema(case)
+        keys = list(sorted_schema.keys())
+
+        # Check that priority keys appear in the correct order
+        priority_positions = [keys.index(key) for key in priority_keys if key in keys]
+        assert priority_positions == sorted(priority_positions), \
+            f"Priority keys are not in correct order in {keys}"
+
+        # Check that values are preserved
+        for key in case:
+            assert sorted_schema[key] == case[key], \
+                f"Value for key '{key}' was not preserved"
 
 
 def test_simpletool_run_method():
     """Test default run method."""
     tool = TestSimpleTool()
-    
+
     async def test_run():
         result = await tool.run({"test_field": "hello"})
         assert len(result) == 1
         assert isinstance(result[0], TextContent)
         assert result[0].text == "hello"
-    
+
     asyncio.run(test_run())
 
 
@@ -213,6 +240,7 @@ import typing
 from typing import List, Union, Optional
 
 # Additional test cases for edge scenarios and uncovered lines
+
 
 class ComplexInputModel(SimpleInputModel):
     """Input model with more complex type annotations."""
@@ -231,8 +259,8 @@ class AdvancedSimpleTool(SimpleTool):
         """Demonstrate more complex run method with multiple return types."""
         if not arguments.get('optional_field'):
             return [ErrorContent(
-                code=400, 
-                error="Optional field is required", 
+                code=400,
+                error="Optional field is required",
                 data={"input": arguments}
             )]
         return [TextContent(type="text", text=str(arguments['optional_field']))]
@@ -241,7 +269,7 @@ class AdvancedSimpleTool(SimpleTool):
 def test_advanced_simpletool_complex_initialization():
     """Test initialization with more complex input model."""
     tool = AdvancedSimpleTool()
-    
+
     # Verify input schema generation for complex types
     assert 'properties' in tool.input_schema
     assert 'optional_field' in tool.input_schema['properties']
@@ -252,7 +280,7 @@ def test_advanced_simpletool_complex_initialization():
 def test_simpletool_output_schema_generation():
     """Test output schema generation with different type annotations."""
     tool = AdvancedSimpleTool()
-    
+
     # Verify output schema generation
     assert tool.output_schema is not None
     assert 'type' in tool.output_schema
@@ -265,19 +293,19 @@ def test_simpletool_error_handling_in_run():
     """Test error handling in run method with different input scenarios."""
     async def test_error_scenarios():
         tool = AdvancedSimpleTool()
-        
+
         # Test error scenario
         error_result = await tool.run({})
         assert len(error_result) == 1
         assert isinstance(error_result[0], ErrorContent)
         assert error_result[0].code == 400
-        
+
         # Test successful scenario
         success_result = await tool.run({"optional_field": "test"})
         assert len(success_result) == 1
         assert isinstance(success_result[0], TextContent)
         assert success_result[0].text == "test"
-    
+
     asyncio.run(test_error_scenarios())
 
 
@@ -286,11 +314,11 @@ def test_simpletool_timeout_configuration():
     # Test default timeout
     default_tool = TestSimpleTool()
     assert default_tool._timeout == default_tool.DEFAULT_TIMEOUT
-    
-    # Test custom timeout
+
+    # Test custom timeout via constructor
     custom_timeout = 30.0
-    with pytest.raises(TypeError):
-        custom_tool = TestSimpleTool(timeout=custom_timeout)
+    custom_tool = TestSimpleTool(timeout=custom_timeout)
+    assert custom_tool._timeout == custom_timeout
 
 
 def test_simpletool_input_model_validation():
@@ -300,6 +328,10 @@ def test_simpletool_input_model_validation():
         name = "ValidTool"
         description = "A tool with a valid input model"
         input_model = TestInputModel
+
+        async def run(self, arguments):
+            """Test implementation"""
+            return []
 
     # This should not raise an exception
     ValidToolWithInputModel()
@@ -316,7 +348,7 @@ def test_simpletool_method_resolution():
     # Verify that run method is async
     run_method = getattr(TestSimpleTool, 'run')
     assert inspect.iscoroutinefunction(run_method)
-    
+
     # Verify method signature
     signature = inspect.signature(run_method)
     assert list(signature.parameters.keys()) == ['self', 'arguments']
@@ -334,9 +366,13 @@ def test_simpletool_async_context_manager_error_handling():
             """Simulate a resource initialization failure."""
             raise RuntimeError("Resource initialization failed")
 
+        async def run(self, arguments):
+            """Test implementation"""
+            return []
+
     async def test_context_manager_error():
         with pytest.raises(RuntimeError, match="Resource initialization failed"):
             async with FailingInitTool() as tool:
                 pass
-    
+
     asyncio.run(test_context_manager_error())

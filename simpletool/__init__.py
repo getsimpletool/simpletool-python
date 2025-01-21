@@ -1,7 +1,7 @@
 """
 name: SimpleTools
 author: Artur Zdolinski
-version: 0.0.14
+version: 0.0.20
 """
 import asyncio
 import os
@@ -9,19 +9,36 @@ import random
 import json
 import functools
 import logging
-import re
 from functools import wraps
-from abc import ABC
-from typing import List, Dict, Any, Union, Type, Literal, Sequence, Tuple, get_args
-from typing import Optional, TypeVar, AnyStr, Callable, Awaitable, Coroutine, ClassVar, TypeAlias   # noqa: F401, F403
-from pydantic import BaseModel, Field
+from abc import ABC, abstractmethod
+from typing import get_args
+from typing import List, Dict, Any, Union, Type, Literal, ClassVar, Sequence, Tuple, TypeVar, Optional, Callable
+from typing import AnyStr, Awaitable, Coroutine, TypeAlias   # noqa: F401, F403
+from pydantic import BaseModel
+from pydantic import Field  # noqa: F401
 from pydantic.fields import FieldInfo
-from .types import Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent
+from contextlib import AsyncExitStack
+from .types import (
+    Content, TextContent, ImageContent, FileContent,
+    ResourceContent, BoolContent, ErrorContent
+)
 from .models import SimpleInputModel, SimpleToolResponseModel
 from .schema import NoTitleDescriptionJsonSchema
-from .errors import SimpleToolError, ValidationError
+from .errors import ValidationError
 import sys
+import psutil
+import gc
+from weakref import WeakMethod, ref, WeakSet
 from pathlib import Path
+
+# Type for input arguments - can be dict or any model inheriting from SimpleInputModel
+T = TypeVar('T', Dict[str, Any], SimpleInputModel)
+
+# Type for return value - can be specified by the tool implementation
+R = TypeVar('R', bound=Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent])
+
+# Threshold for what we consider a "large" object (1MB)
+LARGE_OBJECT_THRESHOLD = 1024 * 1024  # 1MB in bytes
 
 
 def get_valid_content_types() -> Tuple[Type, ...]:
@@ -61,65 +78,81 @@ def set_timeout(seconds):
 
 
 class SimpleTool(ABC):
-    """Base class for all simple tools. """
-    name: str = Field(
-        ...,
-        description="Name of the tool",
-        pattern="^[a-zA-Z0-9_-]+$",
-        max_length=64
-    )
-    description: str = Field(
-        ...,
-        description="Description of the tool's functionality",
-        max_length=1024
-    )
-    input_model: ClassVar[Type[SimpleInputModel]]  # Class-level input model
+    """Base class for all simple tools."""
+    # Default timeout - 60 seconds
+    DEFAULT_TIMEOUT = 60
 
-    # Add default timeout configuration
-    DEFAULT_TIMEOUT: ClassVar[float] = 60.0  # 1 minute default timeout
+    # Default memory limit - 200MB
+    DEFAULT_MEMORY_LIMIT = 200 * 1024 * 1024  # 200MB in bytes
 
-    def __init__(self):
+    # Class attributes that must be defined by subclasses
+    name: ClassVar[str]
+    description: ClassVar[str]
+    input_model: ClassVar[Type[SimpleInputModel]]  # This is a class variable, not an instance field
+
+    # Private attributes with type hints
+    _timeout: float
+    _memory_limit: int
+    _process: psutil.Process
+    _large_objects: WeakSet
+    _callbacks: List
+    _resources: List
+    _exit_stack: AsyncExitStack
+    input_schema: Dict[str, Any]
+    output_schema: Optional[Dict[str, Any]]
+    output_model: Optional[Type[SimpleInputModel]]
+
+    def __new__(cls, *args, **kwargs):
         """
-        Initialize SimpleTool.
+        Create and initialize SimpleTool instance.
+        This runs BEFORE any __init__, so our initialization is guaranteed.
         """
-        # Validate name and description
-        if not hasattr(self, 'name') or not isinstance(self.name, str):
-            raise ValidationError("name", "Tool must have a name attribute of type str")
+        # Validate required class attributes
+        if not hasattr(cls, 'name') or not isinstance(cls.name, str):
+            raise ValueError(f"Class {cls.__name__} must define 'name' as a string")
+        if not hasattr(cls, 'description') or not isinstance(cls.description, str):
+            raise ValueError(f"Class {cls.__name__} must define 'description' as a string")
+        if not hasattr(cls, 'input_model') or not issubclass(cls.input_model, SimpleInputModel):
+            raise ValueError(f"Class {cls.__name__} must define 'input_model' as a subclass of SimpleInputModel")
 
-        if not hasattr(self, 'description') or not isinstance(self.description, str):
-            raise ValidationError("description", "Tool must have a description attribute of type str")
+        instance = super().__new__(cls)
 
-        # Validate name pattern and length
+        # Get timeout from kwargs or use default
+        timeout = kwargs.get('timeout', cls.DEFAULT_TIMEOUT)
+        instance._timeout = timeout if timeout is not None else cls.DEFAULT_TIMEOUT
 
-        if not re.match("^[a-zA-Z0-9_-]+$", self.name):
-            raise ValidationError("name", "Tool name must contain only alphanumeric characters, underscores, and hyphens")
-        if len(self.name) > 64:
-            raise ValidationError("name", "Tool name cannot exceed 64 characters")
+        # Initialize memory monitoring
+        instance._memory_limit = cls.DEFAULT_MEMORY_LIMIT
+        instance._process = psutil.Process(os.getpid())
 
-        # Validate description length
-        if len(self.description) > 1024:
-            raise ValidationError("description", "Tool description cannot exceed 1024 characters")
+        # Initialize memory tracking
+        instance._large_objects = WeakSet()  # Track large objects without creating strong references
 
-        # Validate input_model is defined at the class level
-        if not hasattr(self.__class__, 'input_model') or not issubclass(self.__class__.input_model, SimpleInputModel):
-            raise ValidationError("input_model", f"Subclass {self.__class__.__name__} must define a class-level 'input_model' as a subclass of SimpleInputModel")
+        # Initialize callbacks with weak references
+        instance._callbacks = []
 
-        # Dynamically generate input_schema from input_model
-        self.input_schema = self.__class__.input_model.model_json_schema()
+        # Initialize resource management
+        instance._resources = []
+        instance._exit_stack = AsyncExitStack()
 
-        # Generate output_schema and output_model from return type
-        run_method = getattr(self.__class__, 'run', None)
-        self.output_model = None
+        # Initialize schemas
+        instance.input_schema = instance._sort_input_schema(
+            cls.input_model.model_json_schema()
+        )
+
+        # Get output model from run method return type annotation
+        run_method = getattr(cls, 'run', None)
+        instance.output_model = None
         if run_method is not None:
-            self.output_model = run_method.__annotations__.get('return')
+            instance.output_model = run_method.__annotations__.get('return')
 
         # Generate output schema from output model if available
-        if self.output_model is not None:
+        if instance.output_model is not None:
             # Get inner type(s) from Sequence/List
-            if not hasattr(self.output_model, '__origin__'):
+            if not hasattr(instance.output_model, '__origin__'):
                 inner_types = []  # Invalid type annotation
             else:
-                inner_type = get_args(self.output_model)[0]  # Get the type inside Sequence/List
+                inner_type = get_args(instance.output_model)[0]  # Get the type inside Sequence/List
                 # Extract types from Union or UnionType
                 if hasattr(inner_type, '__origin__') and inner_type.__origin__ is Union:
                     # Handle typing.Union
@@ -130,28 +163,400 @@ class SimpleTool(ABC):
                 else:
                     # Single type
                     inner_types = [inner_type]
-            self.output_schema = {
-                "type": "array",
-                "items": {
-                    "oneOf": [
-                        t.model_json_schema() for t in inner_types
-                    ]
-                }
-            }
-        else:
-            self.output_schema = None
 
-        # Remove timeout-related initialization
-        self._timeout = self.DEFAULT_TIMEOUT
+            # Filter only types that have model_json_schema
+            valid_types = [t for t in inner_types if hasattr(t, 'model_json_schema')]
+            if valid_types:
+                instance.output_schema = {
+                    "type": "array",
+                    "items": {
+                        "oneOf": [
+                            t.model_json_schema() for t in valid_types
+                        ]
+                    }
+                }
+            else:
+                instance.output_schema = None
+        else:
+            instance.output_schema = None
+
+        return instance
+
+    def __init__(self, *, timeout: Optional[float] = None):
+        """
+        Initialize SimpleTool.
+
+        Args:
+            timeout (float, optional): Custom timeout value in seconds. If not provided, uses DEFAULT_TIMEOUT.
+        """
+        pass
+
+    async def __call__(self, arguments: Dict[str, Any]) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
+        """
+        Execute the tool with memory management and validation.
+        This is the main entry point that handles all the memory management.
+        Users should implement run() instead of overriding this method.
+        """
+        try:
+            # Monitor memory before execution
+            self._monitor_memory()
+
+            # Check memory pressure before execution
+            await self._release_memory_under_pressure()
+
+            # Auto-track arguments
+            self._auto_track_large_object(arguments)
+
+            try:
+                # Validate arguments
+                validated_arguments = self.input_model.model_validate(arguments)
+            except ValidationError as e:
+                return [ErrorContent(
+                    code=400,  # Bad Request
+                    error=f"Input validation error: {e}",
+                    data={"validation_error": str(e)}
+                )]
+
+            # Execute with timeout if needed
+            try:
+                if self._timeout > 0:
+                    result = await asyncio.wait_for(
+                        self.run(validated_arguments),
+                        timeout=self._timeout
+                    )
+                else:
+                    result = await self.run(validated_arguments)
+
+                # Auto-track results
+                if isinstance(result, (list, tuple)):
+                    for item in result:
+                        self._auto_track_large_object(item)
+                else:
+                    self._auto_track_large_object(result)
+
+                return result
+
+            except asyncio.TimeoutError:
+                return [ErrorContent(
+                    code=408,  # Request Timeout
+                    error=f"Tool execution timed out after {self._timeout} seconds",
+                    data={"timeout": self._timeout}
+                )]
+
+            # Check memory pressure after execution
+            await self._release_memory_under_pressure()
+
+            # Monitor memory after execution
+            self._monitor_memory()
+
+        except Exception as e:
+            logging.error("Error during tool execution: %s", e)
+            raise
+        finally:
+            # Clean callbacks after each run
+            self._clean_callbacks()
+
+    @abstractmethod
+    @validate_tool_output
+    async def run(self, arguments: T) -> Sequence[R]:
+        """
+        Execute the tool with the given arguments.
+        This is the method that tool developers should implement.
+
+        Args:
+            arguments: Input arguments. Can be either a dict or SimpleInputModel instance.
+
+        Returns:
+            Tool execution results. Must be a sequence of valid content types.
+        """
+        raise NotImplementedError("Subclass must implement run()")
+
+    def _auto_track_large_object(self, obj: Any) -> None:
+        """
+        Automatically track object if it exceeds the size threshold.
+        This is called internally - no user intervention needed.
+        """
+        try:
+            obj_size = sys.getsizeof(obj)
+            if obj_size > LARGE_OBJECT_THRESHOLD:
+                self._large_objects.add(obj)
+                logging.debug(
+                    "Auto-tracking large object of type %s (size: %.2fMB)",
+                    type(obj).__name__,
+                    obj_size / 1024 / 1024
+                )
+        except Exception as e:
+            logging.debug("Error checking object size: %s", e)
+
+    async def _register_resource(self, resource: Any) -> None:
+        """
+        Register a resource for automatic cleanup.
+        Resources will be cleaned up in reverse order of registration.
+
+        Args:
+            resource: The resource to register. Must have close() or __aclose__() method.
+        """
+        if not resource:
+            return
+
+        if not (hasattr(resource, 'close') or hasattr(resource, '__aclose__')):
+            logging.warning("Resource %s has no close or __aclose__ method", resource)
+            return
+
+        self._resources.append(resource)
+        if hasattr(resource, '__aclose__'):
+            await self._exit_stack.enter_async_context(resource)
+        else:
+            self._exit_stack.push(resource)
+
+        logging.debug("Registered resource: %s", resource)
+
+    async def _close_resource(self, resource: Any) -> None:
+        """
+        Safely close a single resource.
+
+        Args:
+            resource: The resource to close
+        """
+        try:
+            if hasattr(resource, '__aclose__'):
+                await resource.__aclose__()
+            elif hasattr(resource, 'close'):
+                resource.close()
+        except Exception as e:
+            logging.error("Error closing resource %s: %s", resource, e)
+
+    async def _close_all_resources(self) -> None:
+        """
+        Close all registered resources in reverse order.
+        Ensures all resources are attempted to be closed even if some fail.
+        """
+        errors = []
+
+        # Close resources in reverse order (LIFO)
+        while self._resources:
+            resource = self._resources.pop()
+            try:
+                await self._close_resource(resource)
+            except Exception as e:
+                errors.append(e)
+                logging.error("Error during resource cleanup: %s", e)
+
+        if errors:
+            logging.error("Encountered %d errors during resource cleanup", len(errors))
 
     async def __aenter__(self):
         """
         Async context manager entry point for resource initialization
         - Proper initialization of resources
         - Guaranteed cleanup of resources, even if exceptions occur
-        - Deterministic resource lifecycle management return self
+        - Deterministic resource lifecycle management
         """
+        await self._exit_stack.__aenter__()
         return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
+        """
+        Async context manager exit point for resource cleanup.
+        Ensures all resources are properly closed in reverse order.
+
+        Args:
+            exc_type: Exception type if an exception occurred
+            exc_val: Exception value if an exception occurred
+            exc_tb: Exception traceback if an exception occurred
+
+        Returns:
+            bool: False to propagate exceptions, True to suppress them
+        """
+        try:
+            # First, run explicit cleanup
+            await self.cleanup()
+
+            # Then close all resources in reverse order
+            await self._close_all_resources()
+
+            # Finally, exit the AsyncExitStack
+            await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
+
+        except Exception as e:
+            logging.error("Error during __aexit__: %s", e)
+            # Re-raise the original exception if there was one
+            if exc_type is not None:
+                return False
+            raise
+        finally:
+            # Clear resource list
+            self._resources.clear()
+
+        # Don't suppress exceptions
+        return False
+
+    async def cleanup(self) -> None:
+        """Explicit cleanup of resources and memory"""
+        try:
+            # First try to release memory under pressure
+            await self._release_memory_under_pressure()
+
+            # Clean callbacks first
+            self._clean_callbacks()
+
+            # Clear any large data structures
+            if hasattr(self, 'input_schema') and isinstance(self.input_schema, dict):
+                self.input_schema.clear()
+            if hasattr(self, 'output_schema') and isinstance(self.output_schema, dict):
+                self.output_schema.clear()
+
+            # Clear any cached properties
+            cached_attrs = [attr for attr in self.__dict__ if attr.startswith('_cached_')]
+            for attr in cached_attrs:
+                delattr(self, attr)
+
+            # Clear callbacks
+            self._callbacks.clear()
+
+            # Clear large objects tracking
+            self._large_objects.clear()
+
+            # Force garbage collection
+            gc.collect()
+
+            # Final memory check
+            self._monitor_memory()
+
+        except Exception as e:
+            logging.error("Error during cleanup: %s", e)
+            raise
+
+    def _sort_input_schema(self, input_schema: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Sort input_schema keys with a specified order.
+
+        The order prioritizes: type, properties, required
+        Any additional keys are added after these in their original order.
+
+        Args:
+            input_schema (Dict[str, Any]): The input schema to be sorted
+
+        Returns:
+            Dict[str, Any]: A sorted version of the input schema
+        """
+        # Define the desired key order
+        priority_keys = ['type', 'properties', 'required']
+
+        # Create a new dictionary with prioritized keys
+        sorted_schema = {}
+
+        # Add priority keys if they exist in the original schema
+        for key in priority_keys:
+            if key in input_schema:
+                sorted_schema[key] = input_schema[key]
+
+        # Add remaining keys in their original order
+        for key, value in input_schema.items():
+            if key not in priority_keys:
+                sorted_schema[key] = value
+
+        return sorted_schema
+
+    def __str__(self) -> str:
+        """Return a one-line JSON string representation of the tool."""
+        sorted_input_schema = self._sort_input_schema(self.input_schema)
+        return json.dumps({
+            "name": str(self.name),
+            "description": str(self.description),
+            "input_schema": sorted_input_schema,
+            "output_schema": self.output_schema
+        }).encode("utf-8").decode("unicode_escape")
+
+    def __repr__(self):
+        # Create a SimpleToolResponseModel internally
+        response_model = SimpleToolResponseModel(
+            name=self.name,
+            description=self.description,
+            input_schema=self.input_schema,
+            output_schema=self.output_schema
+        )
+        # Get the original repr
+        original_repr = repr(response_model)
+        # Replace with the actual child class name
+        return original_repr.replace("SimpleToolResponseModel", self.__class__.__name__)
+
+    def add_callback(self, callback: Callable) -> None:
+        """Add callback using weak reference to prevent memory leaks"""
+        if callback is None:
+            return
+        # Use WeakMethod for bound methods, ref for regular functions
+        weak_cb = WeakMethod(callback) if hasattr(callback, '__self__') else ref(callback)
+        self._callbacks.append(weak_cb)
+
+    def _clean_callbacks(self) -> None:
+        """Clean up dead callback references"""
+        self._callbacks = [cb for cb in self._callbacks if cb() is not None]
+
+    def _monitor_memory(self) -> None:
+        """Monitor memory usage and log warning if exceeding limit"""
+        try:
+            mem_info = self._process.memory_info()
+            if mem_info.rss > self._memory_limit:
+                logging.warning(
+                    "Memory usage warning: Current usage %.2fMB exceeds limit %.2fMB",
+                    mem_info.rss / 1024 / 1024,
+                    self._memory_limit / 1024 / 1024
+                )
+        except Exception as e:
+            logging.error("Error monitoring memory: %s", e)
+
+    async def _release_memory_under_pressure(self) -> None:
+        """
+        Release memory when under pressure.
+        This method is called automatically when memory usage exceeds 90% of the limit.
+        """
+        current_memory = self._process.memory_info().rss
+        if current_memory > self._memory_limit * 0.9:  # 90% of limit
+            logging.warning(
+                "Memory pressure detected: Current usage %.2fMB exceeds 90%% of limit %.2fMB",
+                current_memory / 1024 / 1024,
+                self._memory_limit / 1024 / 1024
+            )
+
+            # Force collection of all generations
+            for generation in range(3):
+                gc.collect(generation)
+
+            # Clear any dead references in our tracking sets
+            self._clean_callbacks()
+
+            # Log remaining large objects
+            remaining_objects = len(self._large_objects)
+            if remaining_objects > 0:
+                logging.warning("Still tracking %d large objects after cleanup", remaining_objects)
+
+    def to_json(self, input_model: Type[BaseModel], schema: Literal["full", "no_title_description"] = "no_title_description"):
+        """Convert the InputModel to JSON schema."""
+        if schema == "no_title_description":
+            return input_model.model_json_schema(schema_generator=NoTitleDescriptionJsonSchema)
+        return input_model.model_json_schema()
+
+    @property
+    def info(self) -> Dict[str, Any]:
+        """Return a dictionary representation of the tool."""
+        sorted_input_schema = self._sort_input_schema(self.input_schema)
+        return {
+            "name": self.name,
+            "description": self.description,
+            "input_schema": sorted_input_schema,
+            "output_schema": self.output_schema
+        }
+
+    @property
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert content to a dictionary representation"""
+        sorted_input_schema = self._sort_input_schema(self.input_schema)
+        return {
+            "name": self.name,
+            "description": str(self.description),
+            "input_schema": sorted_input_schema
+        }
 
     def __init_subclass__(cls, **kwargs):
         # modify the __init__ method to always call super()
@@ -191,122 +596,31 @@ class SimpleTool(ABC):
         if hasattr(cls, 'input_schema'):
             raise ValidationError("input_schema", f"Subclass {cls.__name__} cannot manually define 'input_schema'. It will be automatically generated from 'input_model'.")
 
-    def _sort_input_schema(self, input_schema: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Sort input_schema keys with a specified order.
-
-        The order prioritizes: type, properties, required
-        Any additional keys are added after these in their original order.
-
-        Args:
-            input_schema (Dict[str, Any]): The input schema to be sorted
-
-        Returns:
-            Dict[str, Any]: A sorted version of the input schema
-        """
-        # Define the desired key order
-        priority_keys = ['type', 'properties', 'required']
-
-        # Create a new dictionary with prioritized keys
-        sorted_schema = {}
-
-        # Add priority keys if they exist in the original schema
-        for key in priority_keys:
-            if key in input_schema:
-                sorted_schema[key] = input_schema[key]
-
-        # Add remaining keys in their original order
-        for key, value in input_schema.items():
-            if key not in priority_keys:
-                sorted_schema[key] = value
-
-        return sorted_schema
-
-    def __str__(self) -> str:
-        """Return a one-line JSON string representation of the tool."""
-        sorted_input_schema = self._sort_input_schema(self.input_schema)
-        return json.dumps({
-            "name": str(self.name),
-            "description": str(self.description),
-            "input_schema": sorted_input_schema
-        }).encode("utf-8").decode("unicode_escape")
-
-    def __repr__(self):
-        # Create a SimpleToolResponseModel internally
-        response_model = SimpleToolResponseModel(
-            name=self.name,
-            description=self.description,
-            input_schema=self.input_schema
-        )
-        # Get the original repr
-        original_repr = repr(response_model)
-        # Replace with the actual child class name
-        return original_repr.replace("SimpleToolResponseModel", self.__class__.__name__)
-
-    @validate_tool_output
-    @set_timeout(DEFAULT_TIMEOUT)
-    async def run(self, arguments: Dict[str, Any]) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
-        """
-        Execute the tool with the given arguments.
-
-        This is the primary method that tool developers should override.
-
-        Args:
-            arguments (Dict[str, Any]): Input arguments for the tool
-
-        Returns:
-            Sequence of content types (text, image, file, resource, or error)
-
-        Raises:
-            TypeError: If arguments are not a dictionary
-            NotImplementedError: If run method is not implemented in child class
-        """
-        # Validate and convert input arguments to the input model
-        try:
-            # Validate that all required fields are present and have correct types
-            validated_arguments = self.input_model.model_validate(arguments)
-        except ValidationError as e:
-            return [ErrorContent(
-                code=400,  # Bad Request
-                error=f"Input validation error: {str(e)}",
-                data={"validation_error": str(e)}
-            )]
-
-        # Apply timeout mechanism
-        if self._timeout > 0:
-            try:
-                # Require implementation in child classes with timeout
-                result = await asyncio.wait_for(
-                    self._run_implementation(validated_arguments),
-                    timeout=self._timeout
-                )
-                return result
-            except asyncio.TimeoutError:
-                return [ErrorContent(
-                    code=408,  # Request Timeout
-                    error=f"Tool execution timed out after {self._timeout} seconds",
-                    data={"timeout": self._timeout}
-                )]
+    def __reduce__(self):
+        """Make SimpleTool picklable by only serializing essential attributes."""
+        # Get module name from the module path
+        module = sys.modules.get(self.__class__.__module__)
+        module_file = getattr(module, '__file__', None) if module else None
+        if module_file and isinstance(module_file, str):
+            # Use the actual module file name without .py extension
+            module_name = Path(module_file).stem
+            self.__class__.__module__ = module_name
         else:
-            # No timeout if _timeout is 0 or negative
-            return await self._run_implementation(validated_arguments)
+            # Fallback to tool name only if we really have to
+            self.__class__.__module__ = self.name
 
-    async def _run_implementation(self, arguments: SimpleInputModel) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
-        """
-        Actual implementation of the tool's run method.
-        Must be implemented by child classes.
+        return (self.__class__, (), {
+            'name': self.name,
+            'description': self.description,
+            'input_schema': getattr(self, 'input_schema', None),
+            'output_schema': getattr(self, 'output_schema', None),
+            '_timeout': getattr(self, '_timeout', self.DEFAULT_TIMEOUT)
+        })
 
-        Args:
-            arguments (SimpleInputModel): Validated input arguments
-
-        Raises:
-            SimpleToolError: If not implemented by child class
-        """
-        raise SimpleToolError(f"Subclass {self.__class__.__name__} must implement _run_implementation method")
-
-    async def __call__(self, arguments: Dict[str, Any]) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
-        """Alias for run method"""
-        return await self.run(arguments)
+    def __setstate__(self, state):
+        """Restore state after unpickling."""
+        for key, value in state.items():
+            setattr(self, key, value)
 
     def _select_random_api_key(self, env_name: str, env_value: str) -> str:
         """ Select random api key from env_value only if env_name contains 'API' and 'KEY' """
@@ -350,144 +664,70 @@ class SimpleTool(ABC):
 
         return envs
 
-    def to_json(self, input_model: Type[BaseModel], schema: Literal["full", "no_title_description"] = "no_title_description"):
-        """Convert the InputModel to JSON schema."""
-        if schema == "no_title_description":
-            return input_model.model_json_schema(schema_generator=NoTitleDescriptionJsonSchema)
-        return input_model.model_json_schema()
-
-    @property
-    def info(self) -> str:
-        """Return a one-line JSON string representation of the tool."""
-        sorted_input_schema = self._sort_input_schema(self.input_schema)
-        return json.dumps({
-            "name": self.name,
-            "description": self.description,
-            "input_schema": sorted_input_schema,
-            "output_schema": self.output_schema
-        }, indent=4)
-
-    @property
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert content to a dictionary representation"""
-        sorted_input_schema = self._sort_input_schema(self.input_schema)
-        return {
-            "name": self.name,
-            "description": str(self.description),
-            "input_schema": sorted_input_schema
-        }
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    @classmethod
+    def create(
+        cls,
+        name: str,
+        description: str,
+        input_model: Type[SimpleInputModel],
+        run_fn: Callable[[SimpleInputModel], Awaitable[Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]]]
+    ) -> 'SimpleTool':
         """
-        Async context manager exit point for resource cleanup
-        Generic async context manager exit point for resource cleanup
-        Attempts to close/release any async or sync resources
+        Create a SimpleTool instance without subclassing.
+
+        Args:
+            name: Name of the tool
+            description: Description of the tool
+            input_model: Input model class (must inherit from SimpleInputModel)
+            run_fn: Async function that implements the tool's logic
+
+        Returns:
+            SimpleTool instance
+
+        Example:
+            ```python
+            async def my_run(arguments: MyInputModel) -> List[TextContent]:
+                return [TextContent(text=f"You said: {arguments.text}")]
+
+            my_tool = SimpleTool.create(
+                name="my_tool",
+                description="A tool for testing",
+                input_model=MyInputModel,
+                run_fn=my_run
+            )
+            ```
         """
-        # Clean up resources, close connections, release locks
-        # Handle any exceptions that occurred during tool execution
-        # Collect any potential resources that might need cleanup
-        resources_to_close = []
+        # Create a new dynamic class
+        tool_cls = type(
+            f"Dynamic{name.title()}Tool",
+            (cls,),
+            {
+                "name": name,
+                "description": description,
+                "input_model": input_model,
+                "run": staticmethod(run_fn)
+            }
+        )
 
-        # Inspect instance attributes for potential resources
-        for attr_name in dir(self):
-            try:
-                attr = getattr(self, attr_name)
+        # Return an instance
+        return tool_cls()
 
-                # Skip magic methods and non-objects
-                if attr_name.startswith('__') or not hasattr(attr, '__class__'):
-                    continue
 
-                # Check for various cleanup methods
-                if hasattr(attr, 'aclose') and asyncio.iscoroutinefunction(attr.aclose):
-                    # aclose() is used by async generators and some async resources
-                    resources_to_close.append(('async_close', attr, 'aclose'))
-                elif hasattr(attr, 'close') and asyncio.iscoroutinefunction(attr.close):
-                    # async close() method
-                    resources_to_close.append(('async_close', attr, 'close'))
-                elif hasattr(attr, 'close') and callable(attr.close):
-                    # sync close() method (files, sockets, etc)
-                    resources_to_close.append(('sync_close', attr, 'close'))
-                elif hasattr(attr, 'disconnect') and callable(attr.disconnect):
-                    # disconnect() method (some database/network resources)
-                    resources_to_close.append(('sync_close', attr, 'disconnect'))
-                elif hasattr(attr, 'cleanup') and callable(attr.cleanup):
-                    # cleanup() method
-                    resources_to_close.append(('sync_close', attr, 'cleanup'))
-                elif all(hasattr(attr, name) for name in ('__enter__', '__exit__')):
-                    # Context manager protocol
-                    resources_to_close.append(('context_manager', attr, None))
-                elif all(hasattr(attr, name) for name in ('__aenter__', '__aexit__')):
-                    # Async context manager protocol
-                    resources_to_close.append(('async_context_manager', attr, None))
-
-                # Check for context managers
-                elif hasattr(attr, '__exit__') and hasattr(attr, '__enter__'):
-                    resources_to_close.append(('context_manager', attr))
-            except Exception:
-                # Ignore any attributes that can't be accessed
-                pass
-
-        # Attempt to close resources
-        for resource_item in resources_to_close:
-            resource = None
-            resource_type = None
-            method_name = None
-            try:
-                # Handle different tuple lengths
-                if len(resource_item) == 2:
-                    resource_type, resource = resource_item
-                elif len(resource_item) == 3:
-                    resource_type, resource, method_name = resource_item
-                else:
-                    # Skip items that don't match expected tuple lengths
-                    continue
-
-                if resource is not None:
-                    if resource_type == 'async_close':
-                        if method_name == 'aclose':
-                            await resource.aclose()
-                        elif method_name == 'close':
-                            await resource.close()
-                    elif resource_type == 'sync_close':
-                        if method_name == 'close':
-                            resource.close()
-                        elif method_name == 'disconnect':
-                            resource.disconnect()
-                        elif method_name == 'cleanup':
-                            resource.cleanup()
-                    elif resource_type == 'context_manager':
-                        resource.__exit__(exc_type, exc_val, exc_tb)
-                    elif resource_type == 'async_context_manager':
-                        await resource.__aexit__(exc_type, exc_val, exc_tb)
-            except Exception as cleanup_error:
-                # Log or handle cleanup errors without interrupting other cleanups
-                logging.warning("Warning: Error cleaning up resource %s: %s", resource, cleanup_error, exc_info=True)
-
-        # Propagate any original exceptions
-        return False
-
-    def __reduce__(self):
-        """Make SimpleTool picklable by only serializing essential attributes."""
-        # Get module name from the module path
-        module = sys.modules.get(self.__class__.__module__)
-        module_file = getattr(module, '__file__', None) if module else None
-        if module_file and isinstance(module_file, str):
-            # Use the actual module file name without .py extension
-            module_name = Path(module_file).stem
-            self.__class__.__module__ = module_name
-        else:
-            # Fallback to tool name only if we really have to
-            self.__class__.__module__ = self.name
-
-        return (self.__class__, (), {
-            'name': self.name,
-            'description': self.description,
-            'input_schema': getattr(self, 'input_schema', None),
-            'output_schema': getattr(self, 'output_schema', None),
-            '_timeout': getattr(self, '_timeout', self.DEFAULT_TIMEOUT)
-        })
-
-    def __setstate__(self, state):
-        """Restore state after unpickling."""
-        for key, value in state.items():
-            setattr(self, key, value)
+__all__ = [
+    'SimpleTool',
+    'Content',
+    'TextContent',
+    'ImageContent',
+    'FileContent',
+    'ResourceContent',
+    'BoolContent',
+    'ErrorContent',
+    'List',
+    'Dict',
+    'Any',
+    'Union',
+    'Optional',
+    'get_valid_content_types',
+    'validate_tool_output',
+    'set_timeout'
+]

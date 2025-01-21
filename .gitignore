@@ -178,4 +178,11 @@ cython_debug/
 
 # Artur
 __*.md
-/example*
+example*
+venv
+tests_manual
+__*/
+*.old
+*.log
+*.backup
+*.tmp

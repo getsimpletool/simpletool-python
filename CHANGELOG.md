@@ -5,12 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-python/tree/master).
 
+## [0.0.20] - 2025-01-21 Milestone Alpha1
+
+### Added:
+- Added AsyncExitStack import from contextlib
+- Completely rewrote the aexit method to use AsyncExitStack for better resource management
+- Key improvements:
+  - Uses AsyncExitStack to properly manage both async and sync resources
+  - Handles context managers directly through enter_async_context and enter_context
+  - Uses push_async_callback and push_callback for explicit resource cleanup
+  - Better error handling with more descriptive logging
+  - Cleaner code structure with proper async/await patterns
+- added `_auto_track_large_object` method to track large objects and prevent memory leaks
+- add `factory` create method to create SimpleTool instances
+- tool.info now return `Dict` and not `str`
 
 ## [0.0.19] - 2025-01-19 Milestone Alpha2
 
 ### Added
-- Make SimpleTool picklable by only serializing essential attributes
+- Make SimpleTool picklable - only serializing essential attributes
 - add output_schema in info property
+- add AsyncExitStack for tracking async resources
 
 ## [0.0.18] - 2025-01-13 Milestone Alpha2
 

@@ -4,62 +4,41 @@ type: <class 'list'>
 [TextContent(type='text', text='You said: Hello, world!')]
 ----------------------------------------------------------------------
 String Representation - str(my_tool):
-Type: <class 'str'>
-{"name": "my_tool", "description": "A tool for testing", "input_schema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}
-
-Tool Details Print - my_tool.info:
-Type: <class 'str'>
-{
-    "name": "my_tool",
-    "description": "A tool for testing",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "text": {
-                "type": "string"
-            }
-        },
-        "required": [
-            "text"
-        ]
-    },
-    "output_schema": {
-        "type": "array",
-        "items": {
-            "oneOf": [
-                {
-                    "additionalProperties": true,
-                    "description": "Text content for a message.",
-                    "properties": {
-                        "type": {
-                            "const": "text",
-                            "default": "text",
-                            "title": "Type",
-                            "type": "string"
-                        },
-                        "text": {
-                            "title": "Text",
-                            "type": "string"
-                        }
-                    },
-                    "required": [
-                        "text"
-                    ],
-                    "title": "TextContent",
-                    "type": "object"
-                }
-            ]
-        }
-    }
-}
-
-Dictionary - my_tool.to_dict:
-Type: <class 'dict'>
-{'name': 'my_tool', 'description': 'A tool for testing', 'input_schema': {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text']}}
+Type: <class '__main__.MyTool'>
+{"name": "my_tool", "description": "A tool for testing", "input_schema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}, "output_schema": {"type": "array", "items": {"oneOf": [{"additionalProperties": true, "description": "Text content for a message.", "properties": {"type": {"const": "text", "default": "text", "title": "Type", "type": "string"}, "text": {"title": "Text", "type": "string"}}, "required": ["text"], "title": "TextContent", "type": "object"}]}}}
 
 String Representation - repr(my_tool):
 Type: <class 'str'>
-MyTool(name='my_tool', description='A tool for testing', input_schema={'properties': {'text': {'type': 'string'}}, 'required': ['text'], 'type': 'object'})
+MyTool(name='my_tool', description='A tool for testing', input_schema={'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text']}, output_schema={'type': 'array', 'items': {'oneOf': [{'additionalProperties': True, 'description': 'Text content for a message.', 'properties': {'type': {'const': 'text', 'default': 'text', 'title': 'Type', 'type': 'string'}, 'text': {'title': 'Text', 'type': 'string'}}, 'required': ['text'], 'title': 'TextContent', 'type': 'object'}]}})
+
+Tool Details Print - my_tool.info:
+Type: <class 'dict'>
+{'description': 'A tool for testing',
+ 'input_schema': {'properties': {'text': {'type': 'string'}},
+                  'required': ['text'],
+                  'type': 'object'},
+ 'name': 'my_tool',
+ 'output_schema': {'items': {'oneOf': [{'additionalProperties': True,
+                                        'description': 'Text content for a '
+                                                       'message.',
+                                        'properties': {'text': {'title': 'Text',
+                                                                'type': 'string'},
+                                                       'type': {'const': 'text',
+                                                                'default': 'text',
+                                                                'title': 'Type',
+                                                                'type': 'string'}},
+                                        'required': ['text'],
+                                        'title': 'TextContent',
+                                        'type': 'object'}]},
+                   'type': 'array'}}
+
+Dictionary - my_tool.to_dict:
+Type: <class 'dict'>
+{'description': 'A tool for testing',
+ 'input_schema': {'properties': {'text': {'type': 'string'}},
+                  'required': ['text'],
+                  'type': 'object'},
+ 'name': 'my_tool'}
 ----------------------------------------------------------------------
 Input: MODEL:
 Type: <class 'pydantic._internal._model_construction.ModelMetaclass'>
@@ -67,7 +46,7 @@ Type: <class 'pydantic._internal._model_construction.ModelMetaclass'>
 
 Input: SCHEMA:
 Type: <class 'dict'>
-{'properties': {'text': {'type': 'string'}}, 'required': ['text'], 'type': 'object'}
+{'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text']}
 
 Output: MODEL:
 Type: <class 'typing._GenericAlias'>
