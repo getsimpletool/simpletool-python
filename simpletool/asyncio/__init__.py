@@ -1,7 +1,7 @@
 """
 name: SimpleTools
 author: Artur Zdolinski
-version: 0.0.20
+version: 0.0.31
 """
 # Standard library imports
 import gc
@@ -53,24 +53,27 @@ for _name in dir(_asyncio):
 # Type for input arguments - can be dict or any model inheriting from SimpleInputModel
 T = TypeVar('T', Dict[str, Any], SimpleInputModel)
 
-# Type for return value - can be specified by the tool implementation
-R = TypeVar('R', bound=Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent])
+# Define a type alias for content types instead of using a TypeVar
+ContentType: TypeAlias = Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]
+
+# Define a type alias for response types that can be either Sequence or List of ContentType
+ResponseType: TypeAlias = Union[Sequence[ContentType], List[ContentType]]
 
 # Threshold for what we consider a "large" object (1MB)
 LARGE_OBJECT_THRESHOLD = 1024 * 1024  # 1MB in bytes
 
 
 def get_valid_content_types() -> Tuple[Type, ...]:
-    """Directly return the types from the TypeVar definition as a tuple"""
-    return (Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent)
+    """Directly return the types from the ContentType definition as a tuple"""
+    return get_args(ContentType)
 
 
 def validate_tool_output(func):
     @wraps(func)
-    async def wrapper(*args: Any, **kwargs: Any) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
+    async def wrapper(*args: Any, **kwargs: Any) -> ResponseType:
         result = await func(*args, **kwargs)
-        if not isinstance(result, list):
-            raise ValidationError("output", "Tool output must be a list")
+        if not isinstance(result, (list, tuple)):
+            raise ValidationError("output", "Tool output must be a list or tuple")
 
         valid_types = get_valid_content_types()
         for item in result:
@@ -223,7 +226,7 @@ class SimpleTool(ABC):
         """
         pass
 
-    async def __call__(self, arguments: Dict[str, Any]) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
+    async def __call__(self, arguments: Dict[str, Any]) -> ResponseType:
         """
         Execute the tool with memory management and validation.
         This is the main entry point that handles all the memory management.
@@ -290,7 +293,7 @@ class SimpleTool(ABC):
 
     @abstractmethod
     @validate_tool_output
-    async def run(self, arguments: T) -> Sequence[R]:
+    async def run(self, arguments: T) -> ResponseType:
         """
         Execute the tool with the given arguments.
         This is the method that tool developers should implement.
@@ -698,10 +701,10 @@ class SimpleTool(ABC):
         name: str,
         description: str,
         input_model: Type[SimpleInputModel],
-        run_fn: Callable[[SimpleInputModel], Awaitable[Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]]]
+        run_fn: Callable[[SimpleInputModel], Awaitable[ResponseType]]
     ) -> 'SimpleTool':
         """
-        Create a SimpleTool instance without subclassing.
+        Create a SimpleTool instance without subclassing..f
 
         Args:
             name: Name of the tool
@@ -750,6 +753,8 @@ __all__ = [
     'ResourceContent',
     'BoolContent',
     'ErrorContent',
+    'ContentType',
+    'ResponseType',
     'List',
     'Dict',
     'Any',
