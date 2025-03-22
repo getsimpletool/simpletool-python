@@ -19,7 +19,7 @@ Simpletool is a powerful SDK that provides a structured approach to building too
 ## ⚡️ Architecture Overview
 
 ```mermaid
-// {{ ... }}
+
 classDiagram
     class Content {
         <<abstract>>
