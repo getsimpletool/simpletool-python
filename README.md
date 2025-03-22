@@ -1,8 +1,8 @@
 # Simpletool
 
-SimpleTool is a lightweight, async-first Python framework designed for creating simple, strict, and explicit type-safe tools with minimal complexity. It embodies some of the Python design Zen principles, such as "Simple is better than complex" and "Explicit is better than implicit".
+SimpleTool is a lightweight Python framework designed for creating simple, strict, and explicit type-safe tools with minimal complexity. It supports both synchronous and asynchronous execution patterns, with the async functionality available in the dedicated `simpletool.asyncio` module. It embodies some of the Python design Zen principles, such as "Simple is better than complex" and "Explicit is better than implicit".
 
-## ⚠️ Disclaimer [2025-01]
+## ⚠️ Disclaimer [2025-03]
 
 * 🛠️ __Under active development__: Expect frequent updates, bugs, and breaking changes.
 * 🤓 __Check the release notes__: Always check the [release notes](./CHANGELOG.md) to verify if there are any breaking changes.
@@ -12,19 +12,14 @@ SimpleTool is a lightweight, async-first Python framework designed for creating 
 Simpletool is a powerful SDK that provides a structured approach to building tools with:
 - Standardized input and output content types
 - Automatic JSON schema generation
-- Async support
+- Both synchronous and asynchronous support
 - Environment variable handling
-- Timeout management (def. 60s)
-
-
-
-## 💬 Example
-Check out the [tool_example.py](./tool_example.py) to see how to use Simpletool to create a simple, type-safe tool.
+- Timeout management in asyncio (def. 60s)
 
 ## ⚡️ Architecture Overview
 
 ```mermaid
-
+// {{ ... }}
 classDiagram
     class Content {
         <<abstract>>
@@ -66,6 +61,17 @@ classDiagram
         +run(arguments: dict) Sequence[Content]
     }
     
+    class AsyncSimpleTool {
+        <<abstract>>
+        +name: str
+        +description: str
+        +input_model: Type[SimpleInputModel]
+        +input_schema: Dict (auto generated)
+        +output_schema: Dict (auto generated)
+        +get_env(arguments: dict, prefix: str)
+        +run(arguments: dict) Sequence[Content]
+    }
+    
     class SimpleInputModel {
         <<interface>>
         AutoValidation
@@ -73,6 +79,8 @@ classDiagram
     
     SimpleTool <-- SimpleInputModel: arguments (Dict[str, Any])
     SimpleTool <-- SimpleInputModel: input_model (Type[SimpleInputModel])_
+    AsyncSimpleTool <-- SimpleInputModel: arguments (Dict[str, Any])
+    AsyncSimpleTool <-- SimpleInputModel: input_model (Type[SimpleInputModel])_
 
     Content --|> TextContent
     Content --|> ImageContent
@@ -80,6 +88,7 @@ classDiagram
     Content --|> ErrorContent
     
     SimpleTool --> Content: returns Sequence[Content]
+    AsyncSimpleTool --> Content: returns Sequence[Content]
 ```
 
 ## 💻 Core Components
@@ -101,16 +110,17 @@ The `SimpleTool` class provides a robust framework for building tools with the f
 
   - Input model needs to be defined as child of `SimpleInputModel` Type and assign to `input_model` attribute inside `SimpleTool` - them magic begins and automaticly:
     - Automatically creates output JSON schemas (`output_schema` / `output_model`) based on the defined `run` method typing 
-    - Automatically creates input JSON schemas (`input_schem`a) based on the input model
+    - Automatically creates input JSON schemas (`input_schema`) based on the input model
 
-- **Async Execution**: 
-  - Native async/await support
+- **Execution Models**: 
+  - **Synchronous Execution**: Default mode with the standard `run` method
+  - **Asynchronous Execution**: Available via the `simpletool.asyncio` module with the `AsyncSimpleTool` class
   - Configurable timeout management
-  - Contex manager for easy resource management release
+  - Context manager for easy resource management release
 
 - **Environment Integration**: 
-  - Easy retrieval of environment variables (`get_env`)
-  - Support for random API key selection from provided list (`get_env`)
+  - Easy retrieval of environment variables via the `env` parameter
+  - Support for random API key selection from provided list of API keys
 
 ### Content Types
 
@@ -133,7 +143,7 @@ pip install simpletool
 
 ## 🔄 Quick Start
 
-### 🛠️ Creating a Tool
+### 🛠️ Creating a Synchronous Tool
 
 ```python
 from simpletool import SimpleTool, SimpleInputModel, Sequence, Field
@@ -147,6 +157,28 @@ class MyTool(SimpleTool):
     description = "A simple greeting tool"
     input_model = InputModel
 
+    def run(self, arguments: dict) -> Sequence[TextContent]:
+        # Validation and parsing of input arguments
+        arg: InputModel = InputModel(**arguments)
+
+        return [TextContent(text=f"Hello, {arg.name}!")]
+```
+
+### 🛠️ Creating an Asynchronous Tool
+
+```python
+from simpletool.asyncio import AsyncSimpleTool
+from simpletool import SimpleInputModel, Sequence, Field
+from simpletool.types import TextContent
+
+class InputModel(SimpleInputModel):
+    name: str = Field(description="Name to greet")
+
+class MyAsyncTool(AsyncSimpleTool):
+    name = "greeting_tool"
+    description = "A simple greeting tool"
+    input_model = InputModel
+
     async def run(self, arguments: dict) -> Sequence[TextContent]:
         # Validation and parsing of input arguments
         arg: InputModel = InputModel(**arguments)
@@ -156,12 +188,11 @@ class MyTool(SimpleTool):
 
 ## 📝 Development Guidelines
 
-- Inherit Tool model from `SimpleTool`
+- Inherit Tool model from `SimpleTool` (or `AsyncSimpleTool` for async tools)
 - Define an `input_model` using Pydantic (`SimpleInputModel`)
-- Implement the `run` method
+- Implement the `run` method (synchronous or asynchronous depending on your base class)
 - Return a list/sequence of content types
-- Use async/await for asynchronous operations
-
+- Use the `env` parameter for environment variables
 
 ## 📝 Contributing
 

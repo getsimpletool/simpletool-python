@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [SimpleTool](https://github.com/nchekwa/simpletool-python/tree/master).
 
+
+## [0.0.30] - 2025-03-22
+
+### Changed
+- move async version to `asyncio` module -> `simpletool.asyncio`
+- by default use sync version as we want to support both `sync` and `async`
+- we will only handle passing `env` via argument called `env` (not env_vars or resources.env like it was before)
+
 ## [0.0.20] - 2025-01-21 Milestone Alpha1
 
 ### Added:

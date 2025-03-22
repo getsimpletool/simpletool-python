@@ -1,7 +1,7 @@
 """
 name: SimpleTools
 author: Artur Zdolinski
-version: 0.0.30
+version: 0.0.20
 """
 # Standard library imports
 import gc
@@ -13,19 +13,21 @@ import random
 import sys
 from abc import ABC, abstractmethod
 from collections.abc import Sequence as ABCSequence
-from contextlib import ExitStack
+from contextlib import AsyncExitStack
 from functools import wraps
 from pathlib import Path
 from typing import get_args, get_origin
 from typing import List, Dict, Any, Union, Type, Literal, ClassVar, Sequence, Tuple, TypeVar, Optional, Callable
-from typing import AnyStr  # noqa: F401, F403
+from typing import AnyStr, Awaitable, Coroutine, TypeAlias   # noqa: F401, F403
 from weakref import WeakMethod, ref, WeakSet
+
+# Import the real asyncio module and re-export it
+import asyncio as _asyncio
 
 # Third-party imports
 from pydantic import BaseModel
 from pydantic import Field  # noqa: F401
 from pydantic.fields import FieldInfo
-import asyncio
 
 # Local imports
 from simpletool.types import (
@@ -35,7 +37,18 @@ from simpletool.types import (
 from simpletool.models import SimpleInputModel, SimpleToolResponseModel
 from simpletool.schema import NoTitleDescriptionJsonSchema
 from simpletool.errors import ValidationError
-from simpletool.asyncio import SimpleTool as AsyncSimpleTool
+
+# Re-export all public attributes from the real asyncio module
+# This makes simpletool.asyncio behave like the real asyncio module
+_this_module = sys.modules[__name__]
+for _name in dir(_asyncio):
+    if not _name.startswith('_'):  # Only export public attributes
+        setattr(_this_module, _name, getattr(_asyncio, _name))
+
+# Add any simpletool.asyncio specific functionality below this line
+
+# When using asyncio in this module, use _asyncio to refer to the original module
+# For example: _asyncio.create_task() instead of asyncio.create_task()
 
 # Type for input arguments - can be dict or any model inheriting from SimpleInputModel
 T = TypeVar('T', Dict[str, Any], SimpleInputModel)
@@ -54,25 +67,8 @@ def get_valid_content_types() -> Tuple[Type, ...]:
 
 def validate_tool_output(func):
     @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
-        result = func(*args, **kwargs)
-
-        # Handle coroutines for backward compatibility with async code
-        if asyncio.iscoroutine(result):
-            async def _async_wrapper():
-                async_result = await result
-                if not isinstance(async_result, list):
-                    raise ValidationError("output", "Tool output must be a list")
-
-                valid_types = get_valid_content_types()
-                for item in async_result:
-                    if not any(isinstance(item, t) for t in valid_types):
-                        raise ValidationError("output_type", f"Invalid output type: {type(item)}. Expected one of {[t.__name__ for t in valid_types]}")
-                return async_result
-
-            return asyncio.run(_async_wrapper())
-
-        # Handle synchronous results
+    async def wrapper(*args: Any, **kwargs: Any) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
+        result = await func(*args, **kwargs)
         if not isinstance(result, list):
             raise ValidationError("output", "Tool output must be a list")
 
@@ -84,8 +80,27 @@ def validate_tool_output(func):
     return wrapper
 
 
+def set_timeout(seconds):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            try:
+                return await _asyncio.wait_for(func(*args, **kwargs), timeout=seconds)
+            except _asyncio.TimeoutError:
+                return [ErrorContent(
+                    code=408,  # Request Timeout
+                    error=f"Tool execution timed out after {seconds} seconds",
+                    data={"timeout": seconds}
+                )]
+        return wrapper
+    return decorator
+
+
 class SimpleTool(ABC):
     """Base class for all simple tools."""
+    # Default timeout - 60 seconds
+    DEFAULT_TIMEOUT = 60
+
     # Default memory limit - 200MB
     DEFAULT_MEMORY_LIMIT = 200 * 1024 * 1024  # 200MB in bytes
 
@@ -95,12 +110,13 @@ class SimpleTool(ABC):
     input_model: ClassVar[Type[SimpleInputModel]]  # This is a class variable, not an instance field
 
     # Private attributes with type hints
+    _timeout: float
     _memory_limit: int
     _process: psutil.Process
     _large_objects: WeakSet
     _callbacks: List
     _resources: List
-    _exit_stack: ExitStack
+    _exit_stack: AsyncExitStack
     input_schema: Dict[str, Any]
     output_schema: Optional[Dict[str, Any]]
     output_model: Optional[Type[SimpleInputModel]]
@@ -120,8 +136,13 @@ class SimpleTool(ABC):
 
         instance = super().__new__(cls)
 
-        # Initialize memory management
+        # Get timeout from kwargs or use default
+        timeout = kwargs.get('timeout', cls.DEFAULT_TIMEOUT)
+        instance._timeout = timeout if timeout is not None else cls.DEFAULT_TIMEOUT
+
+        # Initialize memory monitoring
         instance._memory_limit = cls.DEFAULT_MEMORY_LIMIT
+        instance._process = psutil.Process(os.getpid())
 
         # Initialize memory tracking
         instance._large_objects = WeakSet()  # Track large objects without creating strong references
@@ -131,7 +152,7 @@ class SimpleTool(ABC):
 
         # Initialize resource management
         instance._resources = []
-        instance._exit_stack = ExitStack()
+        instance._exit_stack = AsyncExitStack()
 
         # Initialize schemas
         instance.input_schema = instance._sort_input_schema(
@@ -193,14 +214,16 @@ class SimpleTool(ABC):
 
         return instance
 
-    def __init__(self):
+    def __init__(self, *, timeout: Optional[float] = None):
         """
         Initialize SimpleTool.
-        """
-        # Initialize memory management
-        self._process = psutil.Process()
 
-    def __call__(self, arguments: Dict[str, Any]) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
+        Args:
+            timeout (float, optional): Custom timeout value in seconds. If not provided, uses DEFAULT_TIMEOUT.
+        """
+        pass
+
+    async def __call__(self, arguments: Dict[str, Any]) -> Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]:
         """
         Execute the tool with memory management and validation.
         This is the main entry point that handles all the memory management.
@@ -211,7 +234,7 @@ class SimpleTool(ABC):
             self._monitor_memory()
 
             # Check memory pressure before execution
-            self._release_memory_under_pressure()
+            await self._release_memory_under_pressure()
 
             # Auto-track arguments
             self._auto_track_large_object(arguments)
@@ -226,9 +249,15 @@ class SimpleTool(ABC):
                     data={"validation_error": str(e)}
                 )]
 
-            # Execute the tool's run method
+            # Execute with timeout if needed
             try:
-                result = self.run(validated_arguments)
+                if self._timeout > 0:
+                    result = await _asyncio.wait_for(
+                        self.run(validated_arguments),
+                        timeout=self._timeout
+                    )
+                else:
+                    result = await self.run(validated_arguments)
 
                 # Auto-track results
                 if isinstance(result, (list, tuple)):
@@ -239,15 +268,15 @@ class SimpleTool(ABC):
 
                 return result
 
-            except Exception as e:
+            except _asyncio.TimeoutError:
                 return [ErrorContent(
-                    code=500,  # Internal Server Error
-                    error=f"Tool execution error: {str(e)}",
-                    data={"error": str(e)}
+                    code=408,  # Request Timeout
+                    error=f"Tool execution timed out after {self._timeout} seconds",
+                    data={"timeout": self._timeout}
                 )]
 
             # Check memory pressure after execution
-            self._release_memory_under_pressure()
+            await self._release_memory_under_pressure()
 
             # Monitor memory after execution
             self._monitor_memory()
@@ -261,7 +290,7 @@ class SimpleTool(ABC):
 
     @abstractmethod
     @validate_tool_output
-    def run(self, arguments: T) -> Sequence[R]:
+    async def run(self, arguments: T) -> Sequence[R]:
         """
         Execute the tool with the given arguments.
         This is the method that tool developers should implement.
@@ -273,17 +302,6 @@ class SimpleTool(ABC):
             Tool execution results. Must be a sequence of valid content types.
         """
         raise NotImplementedError("Subclass must implement run()")
-
-    def arun(self, arguments: T) -> Sequence[R]:
-        """
-        For compatibility with async version. This method simply calls run().
-        If you need async functionality, use simpletool.asyncio.SimpleTool instead.
-        """
-        from warnings import warn
-        warn("arun() is a compatibility method that calls the synchronous run(). "
-             "For async support, use simpletool.asyncio.SimpleTool instead.",
-             DeprecationWarning, stacklevel=2)
-        return self.run(arguments)
 
     def _auto_track_large_object(self, obj: Any) -> None:
         """
@@ -302,27 +320,30 @@ class SimpleTool(ABC):
         except Exception as e:
             logging.debug("Error checking object size: %s", e)
 
-    def _register_resource(self, resource: Any) -> None:
+    async def _register_resource(self, resource: Any) -> None:
         """
         Register a resource for automatic cleanup.
         Resources will be cleaned up in reverse order of registration.
 
         Args:
-            resource: The resource to register. Must have close() method.
+            resource: The resource to register. Must have close() or __aclose__() method.
         """
         if not resource:
             return
 
-        if not hasattr(resource, 'close'):
-            logging.warning("Resource %s has no close method", resource)
+        if not (hasattr(resource, 'close') or hasattr(resource, '__aclose__')):
+            logging.warning("Resource %s has no close or __aclose__ method", resource)
             return
 
         self._resources.append(resource)
-        self._exit_stack.push(resource)
+        if hasattr(resource, '__aclose__'):
+            await self._exit_stack.enter_async_context(resource)
+        else:
+            self._exit_stack.push(resource)
 
         logging.debug("Registered resource: %s", resource)
 
-    def _close_resource(self, resource: Any) -> None:
+    async def _close_resource(self, resource: Any) -> None:
         """
         Safely close a single resource.
 
@@ -330,12 +351,14 @@ class SimpleTool(ABC):
             resource: The resource to close
         """
         try:
-            if hasattr(resource, 'close'):
+            if hasattr(resource, '__aclose__'):
+                await resource.__aclose__()
+            elif hasattr(resource, 'close'):
                 resource.close()
         except Exception as e:
             logging.error("Error closing resource %s: %s", resource, e)
 
-    def _close_all_resources(self) -> None:
+    async def _close_all_resources(self) -> None:
         """
         Close all registered resources in reverse order.
         Ensures all resources are attempted to be closed even if some fail.
@@ -346,7 +369,7 @@ class SimpleTool(ABC):
         while self._resources:
             resource = self._resources.pop()
             try:
-                self._close_resource(resource)
+                await self._close_resource(resource)
             except Exception as e:
                 errors.append(e)
                 logging.error("Error during resource cleanup: %s", e)
@@ -354,19 +377,19 @@ class SimpleTool(ABC):
         if errors:
             logging.error("Encountered %d errors during resource cleanup", len(errors))
 
-    def __enter__(self):
+    async def __aenter__(self):
         """
-        Context manager entry point for resource initialization
+        Async context manager entry point for resource initialization
         - Proper initialization of resources
         - Guaranteed cleanup of resources, even if exceptions occur
         - Deterministic resource lifecycle management
         """
-        self._exit_stack.__enter__()
+        await self._exit_stack.__aenter__()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
         """
-        Context manager exit point for resource cleanup.
+        Async context manager exit point for resource cleanup.
         Ensures all resources are properly closed in reverse order.
 
         Args:
@@ -379,16 +402,16 @@ class SimpleTool(ABC):
         """
         try:
             # First, run explicit cleanup
-            self.cleanup()
+            await self.cleanup()
 
             # Then close all resources in reverse order
-            self._close_all_resources()
+            await self._close_all_resources()
 
-            # Finally, exit the ExitStack
-            self._exit_stack.__exit__(exc_type, exc_val, exc_tb)
+            # Finally, exit the AsyncExitStack
+            await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
 
         except Exception as e:
-            logging.error("Error during __exit__: %s", e)
+            logging.error("Error during __aexit__: %s", e)
             # Re-raise the original exception if there was one
             if exc_type is not None:
                 return False
@@ -400,11 +423,11 @@ class SimpleTool(ABC):
         # Don't suppress exceptions
         return False
 
-    def cleanup(self) -> None:
+    async def cleanup(self) -> None:
         """Explicit cleanup of resources and memory"""
         try:
             # First try to release memory under pressure
-            self._release_memory_under_pressure()
+            await self._release_memory_under_pressure()
 
             # Clean callbacks first
             self._clean_callbacks()
@@ -515,7 +538,7 @@ class SimpleTool(ABC):
         except Exception as e:
             logging.error("Error monitoring memory: %s", e)
 
-    def _release_memory_under_pressure(self) -> None:
+    async def _release_memory_under_pressure(self) -> None:
         """
         Release memory when under pressure.
         This method is called automatically when memory usage exceeds 90% of the limit.
@@ -560,12 +583,11 @@ class SimpleTool(ABC):
     @property
     def to_dict(self) -> Dict[str, Any]:
         """Convert content to a dictionary representation"""
+        sorted_input_schema = self._sort_input_schema(self.input_schema)
         return {
-            'name': getattr(self, 'name', ''),
-            'description': getattr(self, 'description', ''),
-            'input_schema': getattr(self, 'input_schema', {}),
-            'output_schema': getattr(self, 'output_schema', None),
-            '_memory_limit': getattr(self, '_memory_limit', self.DEFAULT_MEMORY_LIMIT)
+            "name": self.name,
+            "description": str(self.description),
+            "input_schema": sorted_input_schema
         }
 
     def __init_subclass__(cls, **kwargs):
@@ -623,7 +645,8 @@ class SimpleTool(ABC):
             'name': self.name,
             'description': self.description,
             'input_schema': getattr(self, 'input_schema', None),
-            'output_schema': getattr(self, 'output_schema', None)
+            'output_schema': getattr(self, 'output_schema', None),
+            '_timeout': getattr(self, '_timeout', self.DEFAULT_TIMEOUT)
         })
 
     def __setstate__(self, state):
@@ -675,7 +698,7 @@ class SimpleTool(ABC):
         name: str,
         description: str,
         input_model: Type[SimpleInputModel],
-        run_fn: Callable[[SimpleInputModel], Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]]
+        run_fn: Callable[[SimpleInputModel], Awaitable[Sequence[Union[Content, TextContent, ImageContent, FileContent, ResourceContent, BoolContent, ErrorContent]]]]
     ) -> 'SimpleTool':
         """
         Create a SimpleTool instance without subclassing.
@@ -684,14 +707,14 @@ class SimpleTool(ABC):
             name: Name of the tool
             description: Description of the tool
             input_model: Input model class (must inherit from SimpleInputModel)
-            run_fn: Function that implements the tool's logic
+            run_fn: Async function that implements the tool's logic
 
         Returns:
             SimpleTool instance
 
         Example:
             ```python
-            def my_run(arguments: MyInputModel) -> List[TextContent]:
+            async def my_run(arguments: MyInputModel) -> List[TextContent]:
                 return [TextContent(text=f"You said: {arguments.text}")]
 
             my_tool = SimpleTool.create(
@@ -720,7 +743,6 @@ class SimpleTool(ABC):
 
 __all__ = [
     'SimpleTool',
-    'AsyncSimpleTool',
     'Content',
     'TextContent',
     'ImageContent',
@@ -734,5 +756,6 @@ __all__ = [
     'Union',
     'Optional',
     'get_valid_content_types',
-    'validate_tool_output'
+    'validate_tool_output',
+    'set_timeout'
 ]

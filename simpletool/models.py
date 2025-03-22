@@ -54,46 +54,44 @@ class SimpleToolResponseModel(BaseModel):
     input_schema: Optional[dict] = Field(None, description="Input schema for the tool, if available")
     output_schema: Optional[dict] = Field(None, description="Output schema for the tool, if available")
 
-    class Config:
-        """Pydantic model configuration."""
-        model_config = {
-            "json_schema_extra": {
-                "example": {
-                    "name": "example_tool",
-                    "description": "An example tool for demonstration",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {
-                            "input": {"type": "string"}
-                        }
-                    },
-                    "output_schema": {
-                        "type": "array",
-                        "items": {
-                            "oneOf": [
-                                {
-                                    "type": "object",
-                                    "title": "TextContent",
-                                    "description": "Text content for a message.",
-                                    "properties": {
-                                        "type": {
-                                            "const": "text",
-                                            "default": "text",
-                                            "title": "Type",
-                                            "type": "string"
-                                        },
-                                        "text": {
-                                            "title": "Text",
-                                            "type": "string"
-                                        }
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "name": "example_tool",
+                "description": "An example tool for demonstration",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "input": {"type": "string"}
+                    }
+                },
+                "output_schema": {
+                    "type": "array",
+                    "items": {
+                        "oneOf": [
+                            {
+                                "type": "object",
+                                "title": "TextContent",
+                                "description": "Text content for a message.",
+                                "properties": {
+                                    "type": {
+                                        "const": "text",
+                                        "default": "text",
+                                        "title": "Type",
+                                        "type": "string"
                                     },
-                                    "required": ["text"],
-                                    "additionalProperties": True,
-                                }
-                            ]
-                        }
+                                    "text": {
+                                        "title": "Text",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": ["text"],
+                                "additionalProperties": True,
+                            }
+                        ]
                     }
                 }
-            },
-            "from_attributes": True  # Enables serialization from other types
-        }
+            }
+        },
+        "from_attributes": True  # Enables serialization from other types
+    }

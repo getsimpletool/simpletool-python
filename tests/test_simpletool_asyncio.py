@@ -1,16 +1,17 @@
 """
-Pytest tests for simpletool.__init__ module (synchronous version).
+Pytest tests for simpletool.__init__ module.
 """
 import pytest
+import asyncio
 import json
 from typing import Sequence, Dict, Any
 from pydantic import Field
 from simpletool import (
     get_valid_content_types,
     SimpleInputModel,
-    SimpleTool,
-    validate_tool_output
+    AsyncSimpleTool
 )
+from simpletool.asyncio import set_timeout, validate_tool_output
 from simpletool.types import (
     ImageContent,
     TextContent,
@@ -24,20 +25,20 @@ from simpletool.errors import ValidationError
 import inspect
 import typing
 
-
 # Test input model for SimpleTool
+
+
 class TestInputModel(SimpleInputModel):
     test_field: str = Field(description="A test field")
 
 
 # Test SimpleTool subclass for testing
-class TestSimpleTool(SimpleTool):
+class TestSimpleTool(AsyncSimpleTool):
     name = "TestTool"
     description = "A tool for testing"
     input_model = TestInputModel
 
-    @validate_tool_output
-    def run(self, arguments: Dict[str, Any]) -> Sequence[TextContent]:
+    async def run(self, arguments: Dict[str, Any]) -> Sequence[TextContent]:
         """Dummy run method for testing."""
         return [TextContent(type="text", text=arguments['test_field'])]
 
@@ -52,29 +53,54 @@ def test_get_valid_content_types():
 def test_validate_tool_output_decorator():
     """Test validate_tool_output decorator."""
     @validate_tool_output
-    def valid_output_tool():
+    async def valid_output_tool():
         return [TextContent(type="text", text="test")]
 
     @validate_tool_output
-    def invalid_output_tool():
+    async def invalid_output_tool():
         return ["not a valid content type"]
 
     # Test valid output
-    result = valid_output_tool()
+    result = asyncio.run(valid_output_tool())
     assert len(result) == 1
     assert isinstance(result[0], TextContent)
 
     # Test invalid output type
     with pytest.raises(ValidationError, match="Invalid output type"):
-        invalid_output_tool()
+        asyncio.run(invalid_output_tool())
 
     # Test non-list output
     @validate_tool_output
-    def non_list_output_tool():
+    async def non_list_output_tool():
         return TextContent(type="text", text="test")
 
     with pytest.raises(ValidationError, match="Tool output must be a list"):
-        non_list_output_tool()
+        asyncio.run(non_list_output_tool())
+
+
+def test_set_timeout_decorator():
+    """Test set_timeout decorator."""
+    @set_timeout(0.1)  # 100ms timeout
+    async def slow_tool():
+        await asyncio.sleep(0.2)
+        return [TextContent(type="text", text="delayed")]
+
+    @set_timeout(0.2)
+    async def fast_tool():
+        await asyncio.sleep(0.1)
+        return [TextContent(type="text", text="quick")]
+
+    # Test timeout
+    result = asyncio.run(slow_tool())
+    assert len(result) == 1
+    assert isinstance(result[0], ErrorContent)
+    assert result[0].code == 408
+    assert "timed out" in result[0].error
+
+    # Test non-timeout
+    result = asyncio.run(fast_tool())
+    assert len(result) == 1
+    assert isinstance(result[0], TextContent)
 
 
 def test_simpletool_initialization():
@@ -89,6 +115,9 @@ def test_simpletool_initialization():
     # Test input schema
     assert "properties" in tool.input_schema
     assert "test_field" in tool.input_schema["properties"]
+
+    # Test timeout
+    assert tool._timeout == tool.DEFAULT_TIMEOUT
 
 
 def test_simpletool_str_representation():
@@ -121,31 +150,34 @@ def test_simpletool_repr():
     assert "test_field" in repr_str
 
 
-def test_simpletool_context_manager():
-    """Test context manager functionality."""
-    with TestSimpleTool() as tool_instance:
-        assert isinstance(tool_instance, TestSimpleTool)
+def test_simpletool_async_context_manager():
+    """Test async context manager functionality."""
+    async def test_context_manager():
+        async with TestSimpleTool() as tool_instance:
+            assert isinstance(tool_instance, TestSimpleTool)
+
+    asyncio.run(test_context_manager())
 
 
 def test_simpletool_subclass_validation():
     """Test validation during subclass creation."""
     # Test invalid name
     with pytest.raises(ValidationError, match="must define a non-empty 'name' string attribute"):
-        class InvalidNameTool(SimpleTool):
+        class InvalidNameTool(AsyncSimpleTool):
             name = ""
             description = "Test tool"
             input_model = TestInputModel
 
     # Test invalid description
     with pytest.raises(ValidationError, match="must define a non-empty 'description' string attribute"):
-        class InvalidDescriptionTool(SimpleTool):
+        class InvalidDescriptionTool(AsyncSimpleTool):
             name = "InvalidTool"
             description = ""
             input_model = TestInputModel
 
     # Test missing input_model
     with pytest.raises(ValidationError, match="must define a class-level 'input_model' as a subclass of SimpleInputModel"):
-        class MissingInputModelTool(SimpleTool):
+        class MissingInputModelTool(AsyncSimpleTool):
             name = "MissingInputModel"
             description = "Test tool"
 
@@ -201,10 +233,14 @@ def test_simpletool_sort_input_schema():
 def test_simpletool_run_method():
     """Test default run method."""
     tool = TestSimpleTool()
-    result = tool.run({"test_field": "hello"})
-    assert len(result) == 1
-    assert isinstance(result[0], TextContent)
-    assert result[0].text == "hello"
+
+    async def test_run():
+        result = await tool.run({"test_field": "hello"})
+        assert len(result) == 1
+        assert isinstance(result[0], TextContent)
+        assert result[0].text == "hello"
+
+    asyncio.run(test_run())
 
 
 class UnionFieldModel(SimpleInputModel):
@@ -212,14 +248,13 @@ class UnionFieldModel(SimpleInputModel):
     union_field: str | int = ""
 
 
-class AdvancedSimpleTool(SimpleTool):
+class AdvancedSimpleTool(AsyncSimpleTool):
     """Advanced SimpleTool for testing complex scenarios."""
     name = "AdvancedTool"
     description = "A tool with complex input and output types"
     input_model = UnionFieldModel
 
-    @validate_tool_output
-    def run(self, arguments: Dict[str, Any]) -> Sequence[TextContent]:
+    async def run(self, arguments: Dict[str, Any]) -> Sequence[TextContent]:
         """Demonstrate more complex run method with multiple return types."""
         return [TextContent(type="text", text=str(arguments['union_field']))]
 
@@ -247,25 +282,39 @@ def test_simpletool_output_schema_generation():
 
 def test_simpletool_error_handling_in_run():
     """Test error handling in run method with different input scenarios."""
-    tool = AdvancedSimpleTool()
+    async def test_error_scenarios():
+        tool = AdvancedSimpleTool()
 
-    # Test successful scenario
-    success_result = tool.run({"union_field": "test"})
-    assert len(success_result) == 1
-    assert isinstance(success_result[0], TextContent)
-    assert success_result[0].text == "test"
+        # Test successful scenario
+        success_result = await tool.run({"union_field": "test"})
+        assert len(success_result) == 1
+        assert isinstance(success_result[0], TextContent)
+        assert success_result[0].text == "test"
+
+    asyncio.run(test_error_scenarios())
+
+
+def test_simpletool_timeout_configuration():
+    """Test timeout configuration and customization."""
+    # Test default timeout
+    default_tool = TestSimpleTool()
+    assert default_tool._timeout == default_tool.DEFAULT_TIMEOUT
+
+    # Test custom timeout via constructor
+    custom_timeout = 30.0
+    custom_tool = TestSimpleTool(timeout=custom_timeout)
+    assert custom_tool._timeout == custom_timeout
 
 
 def test_simpletool_input_model_validation():
     """Test input model validation during tool initialization."""
     # Test valid input model
-    class ValidToolWithInputModel(SimpleTool):
+    class ValidToolWithInputModel(AsyncSimpleTool):
         name = "ValidTool"
         description = "A tool with a valid input model"
         input_model = TestInputModel
 
-        @validate_tool_output
-        def run(self, arguments: Dict[str, Any]) -> Sequence[TextContent]:
+        async def run(self, arguments: Dict[str, Any]) -> Sequence[TextContent]:
             """Test implementation with proper return type annotation."""
             return [TextContent(type="text", text="test")]
 
@@ -274,16 +323,16 @@ def test_simpletool_input_model_validation():
 
     # Test invalid input model
     with pytest.raises(ValidationError, match="must define a class-level 'input_model' as a subclass of SimpleInputModel"):
-        class InvalidToolWithoutInputModel(SimpleTool):
+        class InvalidToolWithoutInputModel(AsyncSimpleTool):
             name = "InvalidTool"
             description = "A tool without an input model"
 
 
 def test_simpletool_method_resolution():
     """Test method resolution and inheritance."""
-    # Verify that run method is not async
+    # Verify that run method is async
     run_method = getattr(TestSimpleTool, 'run')
-    assert not inspect.iscoroutinefunction(run_method)
+    assert inspect.iscoroutinefunction(run_method)
 
     # Verify method signature
     signature = inspect.signature(run_method)
@@ -291,39 +340,27 @@ def test_simpletool_method_resolution():
     assert signature.return_annotation == typing.Sequence[TextContent]
 
 
-def test_simpletool_arun_compatibility():
-    """Test arun compatibility method."""
-    tool = TestSimpleTool()
+def test_simpletool_async_context_manager_error_handling():
+    """Test async context manager with potential resource initialization errors."""
+    class FailingInitTool(AsyncSimpleTool):
+        name = "FailingTool"
+        description = "A tool that fails during initialization"
+        input_model = TestInputModel
 
-    # Test that arun calls run and returns the same result
-    with pytest.warns(DeprecationWarning):
-        result = tool.arun({"test_field": "hello"})
+        async def run(self, arguments: Dict[str, Any]) -> Sequence[TextContent]:
+            """Run method with proper return type annotation."""
+            return [TextContent(type="text", text="This should never be reached")]
 
-    assert len(result) == 1
-    assert isinstance(result[0], TextContent)
-    assert result[0].text == "hello"
+        async def __aenter__(self):
+            """Override __aenter__ to simulate a resource initialization failure."""
+            raise RuntimeError("Resource initialization failed")
 
+    async def test_context_manager_error():
+        with pytest.raises(RuntimeError, match="Resource initialization failed"):
+            async with FailingInitTool() as tool_instance:
+                assert tool_instance.name == "FailingTool"
 
-class FailingInitTool(SimpleTool):
-    name = "FailingTool"
-    description = "A tool that fails during initialization"
-    input_model = TestInputModel
-
-    @validate_tool_output
-    def run(self, arguments: Dict[str, Any]) -> Sequence[TextContent]:
-        """Run method with proper return type annotation."""
-        return [TextContent(type="text", text="This should never be reached")]
-
-    def __enter__(self):
-        """Override __enter__ to simulate a resource initialization failure."""
-        raise RuntimeError("Resource initialization failed")
-
-
-def test_simpletool_context_manager_error_handling():
-    """Test context manager with potential resource initialization errors."""
-    with pytest.raises(RuntimeError, match="Resource initialization failed"):
-        with FailingInitTool() as tool_instance:
-            assert tool_instance.name == "FailingTool"
+    asyncio.run(test_context_manager_error())
 
 
 def test_simpletool_reflection():
@@ -335,7 +372,7 @@ def test_simpletool_reflection():
     assert 'properties' in tool.input_schema
     assert 'union_field' in tool.input_schema['properties']
 
-    # Test info property
+    # Test info method - use the property not a method call
     info_dict = tool.info
     assert isinstance(info_dict, dict)
     assert 'name' in info_dict
