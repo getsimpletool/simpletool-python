@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 import re
 import os
 
@@ -95,7 +95,7 @@ setup(name='simpletool',
       author='Artur Zdolinski',
       author_email='contact@nchekwa.com',
       license='MIT',
-      packages=['simpletool'],
+      packages=find_packages(),
       install_requires=['pydantic>=2.10.4', 'typing-extensions'],
       long_description=open('README.md').read(),
       long_description_content_type='text/markdown',

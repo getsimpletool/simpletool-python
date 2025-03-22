@@ -1,9 +1,3 @@
-"""
-name: SimpleTools
-author: Artur Zdolinski
-version: 0.0.31
-"""
-# Standard library imports
 import gc
 import json
 import logging
